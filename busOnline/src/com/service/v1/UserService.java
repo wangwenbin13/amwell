@@ -1,0 +1,647 @@
+package com.service.v1;
+
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
+
+import org.apache.commons.lang.StringUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.ModelAndView;
+
+import com.util.common.PostHttpClient;
+import com.util.constants.PropertiesConfig;
+import com.util.weixin.WeixinConstants;
+import com.util.weixin.WeixinContentUtil;
+
+/**
+ * /\_/\ (=+_+=) ( ).
+ * 
+ * @author sunjiaxiang 貌似这是一个提供各种和用户有关数据获取处理的类哟。
+ */
+@Service
+@Transactional
+public class UserService {
+
+	// 登录的接口地址；
+	public static String LOGIN_API = "/app_loginAndRegister/login.action";
+	// 检测手机号是否注册
+	public static String CHECK_PHONE_API = "/app_loginAndRegister/checkMobile.action?ns=1&mobile=";
+	// 注册接口
+	public static String REGISTER_API = "/app_loginAndRegister/register.action";
+	// 检测通过id获取用户的接口；
+	public static String GET_USER_BY_ID_API = "/app_loginAndRegister/weiXinLogin.action?uid=";
+	// 绑定openid和用户id;(废弃替换为： BIND_3RD_USER_API)
+	// public static String BIND_OPENID_API =
+	// "/app_loginAndRegister/updateOpenId.action?uid=";
+	// 获取优惠券
+	// public static String COUPON_LIST_API =
+	// "/app_coupon/getUsableCoupon.action";
+	public static String COUPON_LIST_API = "/app_book/getUsableGif.action";
+
+	// 下发短信验证码
+	public static String SEND_MEESSAGE_CODE_API = "/app_loginAndRegister/sendCommenMsg.action";
+	// 检测验证码正确性；
+	public static String CHECK_MESSAGE_CODE_API = "/app_loginAndRegister/login.action";
+	// 票务信息
+	public static String GET_TICKETS_API = "/app_book/getTicktListByV2_3.action";
+	// public static String GET_TICKETS_API =
+	// "/app_book/getTicktListByV2_3.action";
+	public static String GET_TICKET_API = "/app_ticket/showTicket_V2_3.action";
+	public static String GET_ORDER_API = "/app_book/getOrderInfoByV2_1.action";
+	// 获取服务器一些配置；
+	public static String GET_COMMON_DATA_API = "/sysCommon/getCommonData.action";
+
+	// 第三方的用户信息获取
+	public static String GET_3RD_USER_API = "/app_loginAndRegister/getUserIdMap.action";
+	// clientId=321&channelId=456
+	public static String BIND_3RD_USER_API = "/app_loginAndRegister/saveUserIdMap.action";
+	// passengerId=123&clientId=321&channelId=456
+
+	// 第三方用户信息获取；
+	public static String GET_3RD_BY_CP0010 = "http://test.ccplus.wiseyq.com/ccplus/cp/member/getUserInfo.json";
+
+	// 微信的渠道ID;
+	public static String WEIXIN_CHANNEL = "WX";
+	// 云谷对接的参数
+	public static String YCG_CLIENT_ID = "CP0010";
+	public static String YCG_SECRET = "xzbs1qaz2wsx3edc4rfv5tgb6yhn7ujm";
+	// 爱出行的参数
+	public static String ACM_CLIENT_ID = "ACM0001";
+	public static String ACM_SECRET = "xzbs0qaz1wsx2edc3rfv4tgb5yhn6ujm";
+	// 南京迪娜 
+	public static String NJDN_CLIENT_ID = "NJ1024";
+	public static String NJDN_SECRET = "eidewrwerndsfwerwerdfdsfwefrfssd";
+
+	// 150804142601192015
+	// @Autowired
+	// private StringRedisTemplate redisTemplate;
+
+	/** 检测是否为第三方平台； */
+	public String getChannelClientId(String client, String token, String singnature) {
+		if (StringUtils.isEmpty(client))
+			return token;
+		if (client.equals(UserService.YCG_CLIENT_ID)) {
+			return getYCG(token);
+		}
+		if (client.equals(UserService.ACM_CLIENT_ID)) {
+			return getACM(token, singnature.toLowerCase());
+		}
+		if(client.equals(UserService.NJDN_CLIENT_ID)){
+			return getNJDN(token,singnature.toLowerCase());
+		}
+		return token;
+	}
+
+	/** 往mv中添加参数； */
+	private void initUserInfo(String channel, String openId, ModelAndView mv) {
+		mv.addObject("channel", channel);
+		if (StringUtils.isEmpty(openId)) {
+			mv.addObject("passenger", "");
+			return;
+		}
+		mv.addObject("openId", openId);
+		// 根据openId获取用户信息
+		JSONObject passengerInfo = getByOpenId(channel, openId);
+		if (passengerInfo != null && passengerInfo.has("a1") && passengerInfo.getString("a1").equals("0")
+				&& passengerInfo.has("a2") && !StringUtils.isEmpty(passengerInfo.getString("a2"))) {
+			mv.addObject("passenger", passengerInfo.toString(2));
+			mv.addObject("sid", passengerInfo.getString("a2")+"#"+passengerInfo.getString("a15"));
+		} else {
+			mv.addObject("passenger", "");
+		}
+	}
+
+	public boolean initUserInfo(String code, ModelAndView mv) {
+		if (StringUtils.isEmpty(code))
+			return false;
+		return initUserInfo(code, null, null, null, mv);
+	}
+
+	/** 把用户信息初始化； */
+	public boolean initUserInfo(String code, String channel, String token, String singnature, ModelAndView mv) {
+		String openId = null;
+		if (StringUtils.isEmpty(code)) {
+			openId = getChannelClientId(channel, token, singnature);
+		} else {
+			channel = WEIXIN_CHANNEL;
+			openId = loadOpenIdFromWechat(code);
+			if (openId == null) {
+				return false;
+			}
+		}
+		initUserInfo(channel, openId, mv);
+		return true;
+	}
+
+	/** 检测用户信息； */
+	public String getACM(String phone, String singnature) {
+		String openId = phone;
+		StringBuilder sb = new StringBuilder();
+		sb.append(ACM_SECRET);
+		sb.append(ACM_CLIENT_ID);
+		sb.append(phone);
+		try {
+			String mySignature = toMd5(sb.toString());
+			if (!StringUtils.isEmpty(phone) && singnature.equals(mySignature))
+				checkUserById(hasTelephone(phone), phone, openId, ACM_CLIENT_ID);
+			else
+				return null;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return openId;
+	}
+	
+	/** 检测用户信息； */
+	public String getNJDN(String token, String singnature) {
+		String openId = token;
+		StringBuilder sb = new StringBuilder();
+		sb.append(NJDN_CLIENT_ID);
+		sb.append(NJDN_SECRET);
+		sb.append(token);
+		try {
+			String mySignature = toMd5(sb.toString());
+			if (!StringUtils.isEmpty(token) && singnature.equals(mySignature))
+				checkUserById(hasTelephone(token), token, openId, NJDN_CLIENT_ID);
+			else
+				return null;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return openId;
+	}
+	
+	public static void main(String[] args) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(NJDN_CLIENT_ID);
+		sb.append(NJDN_SECRET);
+		sb.append("13770787370");
+		System.out.println(toMd51(sb.toString()));
+	}
+	
+	/** md5的处理； */
+	public static String toMd51(String str) {
+		try {
+			MessageDigest md = MessageDigest.getInstance("MD5");
+			md.update(str.getBytes());
+			byte[] md5 = md.digest();
+			StringBuffer hexValue = new StringBuffer();
+			for (int i = 0; i < md5.length; i++) {
+				int val = ((int) md5[i]) & 0xff;
+				if (val < 16) {
+					hexValue.append("0");
+				}
+				hexValue.append(Integer.toHexString(val));
+			}
+			return hexValue.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	/** 获取用户用户信息； */
+	public String getYCG(String token) {
+		String openId = token.split("-")[1];
+		String st = String.valueOf(new Date().getTime());
+		StringBuffer sb = new StringBuffer();
+		sb.append(YCG_SECRET);
+		sb.append(st);
+		sb.append(token);
+		try {
+			String mySignature = toMd5(sb.toString());
+			Map<String, String> postParam = new HashMap<String, String>();
+			postParam.put("client_id", YCG_CLIENT_ID);
+			postParam.put("access_token", token);
+			postParam.put("st", st);
+			postParam.put("signature", mySignature);
+			String res = PostHttpClient.sendPost(GET_3RD_BY_CP0010, postParam);
+			JSONObject info = JSONObject.fromObject(res);
+			if (info.has("mobile")) {
+				String mobile = info.getString("mobile");
+				if (!StringUtils.isEmpty(mobile)) {
+					checkUserById(hasTelephone(mobile), mobile, openId, YCG_CLIENT_ID);
+				}
+			}
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+		return openId;
+	}
+
+	private void checkUserById(String uid, String mobile, String openId, String channel) {
+		try {
+			if (StringUtils.isEmpty(uid)) {
+				String pwd = mobile.substring(mobile.length() - 6);
+				register(mobile, pwd, openId, channel);
+			} else {
+				JSONObject passengerInfo = getByOpenId(channel, openId);
+				if (passengerInfo == null || !passengerInfo.has("a2")
+						|| StringUtils.isEmpty(passengerInfo.getString("a2"))) {
+					bindOpenId(channel, uid, openId);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/** 获取服务器对缓存的设置； */
+	public JSONObject getCommonData() {
+		JSONObject res = null;
+		Map<String, String> postParam = new HashMap<String, String>();
+		try {
+			res = JSONObject.fromObject(
+					PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + GET_COMMON_DATA_API, postParam));
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	/** 获取票的详细信息； */
+	public JSONObject getTicket(String id, String cid, String uid) {
+		JSONObject res = null;
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("leaseOrderNo", id);
+		postParam.put("uid", uid);
+		postParam.put("cid", cid);
+		try {
+			res = JSONObject
+					.fromObject(PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + GET_TICKET_API, postParam));
+			if (!res.has("a11") || StringUtils.isEmpty(res.getString("a11")))
+				return null;
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	/** 获取订单详情； */
+	public JSONObject getOrder(String id) {
+		JSONObject res = null;
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("orderNo", id);
+		try {
+			res = JSONObject
+					.fromObject(PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + GET_ORDER_API, postParam));
+			if (!res.has("a1") || StringUtils.isEmpty(res.getString("a1")))
+				return null;
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	/** 获取票列表； */
+	public JSONObject getTickets(String uid, String page) {
+		JSONObject res = null;
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("dayNo", page);
+		postParam.put("uid", uid);
+		postParam.put("type", "1");
+		postParam.put("currentPage", "0");
+		postParam.put("pageSize", "100000");
+		try {
+			String result = PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + GET_TICKETS_API, postParam);
+			res = JSONObject.fromObject(result);
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+			res = new JSONObject();
+		}
+		return res;
+	}
+
+	/** 对手机号下发短信； */
+	public boolean sendMessionCode(String phone) {
+		JSONObject res = null;
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("tel", phone);
+		try {
+			res = JSONObject.fromObject(
+					PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + SEND_MEESSAGE_CODE_API, postParam));
+			if (res.has("a1")) {
+				String code = res.getString("a1");
+				if (!StringUtils.isEmpty(code) && code.equals("1")) {
+					return true;
+				}
+			}
+			return false;
+		} catch (UnsupportedEncodingException e) {
+			return false;
+		}
+	}
+
+	/** 获取所下发的短信； */
+	public int checkMessionCode(String phone, String code) {
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("mobile", phone);
+		postParam.put("code", code);
+		JSONObject res = new JSONObject();
+		try {
+			res = JSONObject.fromObject(
+					PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + CHECK_MESSAGE_CODE_API, postParam));
+			if (res.has("a1") && res.getString("a1").equals("0")) {
+				return 0;
+			}
+			return Integer.parseInt(res.getString("a1"));
+		} catch (UnsupportedEncodingException e) {
+			return 3;
+		}
+	}
+
+	/** 获取用户的优惠券； */
+	public JSONArray coupons(String uid, String page) {
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("uid", uid);
+		// postParam.put("uid", "150831163819401289");
+		postParam.put("type", "1");
+		postParam.put("theCount", "10");
+		postParam.put("currentIndex", page);
+		try {
+			/*
+			 * // 新版的优惠券查询，不过没有ID; JSONObject resObj =
+			 * JSONObject.fromObject(PostHttpClient.sendPost(PropertiesConfig.
+			 * API_SERVER_URL + COUPON_LIST_API, postParam)); if
+			 * (resObj.has("list")) return resObj.getJSONArray("list");
+			 * http://192.168.9.6:10054/customline_app/app_coupon/
+			 * getUsableCoupon.action?currentIndex=0&theCount=10&uid=
+			 * 150831163819401289
+			 * http://192.168.9.6:10054/customline_app/app_book/getUsableGif.
+			 * action?uid=150831163819401289&currentIndex=0&theCount=10&type=1
+			 */
+			// 老版本的优惠券；
+			return JSONArray
+					.fromObject(PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + COUPON_LIST_API, postParam));
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+		return new JSONArray();
+	}
+
+	/**
+	 * 检测手机号是否可以使用；
+	 * 
+	 * @param telephone:
+	 *            手机号码
+	 * @return 手机号是否可用；
+	 */
+	public String hasTelephone(String telephone) {
+		StringBuffer url = new StringBuffer();
+		url.append(PropertiesConfig.API_SERVER_URL);
+		url.append(CHECK_PHONE_API);
+		url.append(telephone);
+		String result = PostHttpClient.getHttpReq(url.toString());
+		JSONObject resultData = JSONObject.fromObject(result);
+		String status = resultData.getString("a1");
+		return status.equals("0") ? resultData.getString("a3") : null;
+	}
+
+	/**
+	 * 根据密码获取用户信息
+	 * 
+	 * @param telephone：手机号码
+	 * @param password：密码
+	 * @param openId：微信id
+	 * @return
+	 */
+	public JSONObject getByPassword(String telephone, String password, String openId) throws Exception {
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("mobile", telephone);
+		postParam.put("passWord", password);
+		String result = PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + LOGIN_API, postParam);
+		JSONObject resultData = JSONObject.fromObject(result);
+		String status = resultData.getString("a1");
+		if (status.equals("1")) {
+			throw new Exception("miss");
+		} else if (status.equals("2")) {
+			throw new Exception("errorPassword");
+		} else if (status.equals("3")) {
+			throw new Exception("errorPassword");
+		} else if (status.equals("4")) {
+			throw new Exception("laHei");
+		} else if (status.equals("5")) {
+			throw new Exception("errorPassword");
+		}
+		return resultData;
+	}
+
+	/**
+	 * 根据OpenId获取渠道用户信息
+	 * 
+	 * @param openId
+	 *            用户openId
+	 * @param channel
+	 *            渠道号
+	 * @return PassengerInfo
+	 * @throws UnsupportedEncodingException
+	 */
+	public JSONObject getByOpenId(String channel, String openId) {
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("clientId", openId);
+		postParam.put("channelId", channel);
+		try {
+			JSONObject json = JSONObject
+					.fromObject(PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + GET_3RD_USER_API, postParam));
+			if (json.has("passengerId")) {
+				String uid = json.getString("passengerId");
+				if (!StringUtils.isEmpty(uid))
+					return getByPassengerId(uid);
+			}
+		} catch (Exception exc) {
+			exc.printStackTrace();
+		}
+		return new JSONObject();
+	}
+
+	/**
+	 * 根据乘客id获取用户信息
+	 * 
+	 * @param passengerId：乘客Id
+	 */
+	public JSONObject getByPassengerId(String passengerId) {
+		StringBuffer url = new StringBuffer();
+		url.append(PropertiesConfig.API_SERVER_URL);
+		url.append(GET_USER_BY_ID_API);
+		url.append(passengerId);
+		url.append("&type=");
+		url.append(0);
+		String result = PostHttpClient.getHttpReq(url.toString());
+		if (result.indexOf("a2") == -1) {
+			return null;
+		}
+		return JSONObject.fromObject(result);
+	}
+
+	/** 绑定用户ID和微信ID; */
+	public String bindOpenId(String channel, String id, String openid) throws Exception {
+		if (StringUtils.isEmpty(id)) {
+			JSONObject passenger = getByOpenId(channel, openid);
+			if (passenger == null || !passenger.has("a2"))
+				return null;
+			id = passenger.getString("a2");
+		}
+
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("passengerId", id);
+		postParam.put("clientId", openid);
+		postParam.put("channelId", channel);
+
+		String res = PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + BIND_3RD_USER_API, postParam);
+		return StringUtils.isEmpty(res) ? null : res;
+	}
+
+	/**
+	 * 新用户注册；
+	 * 
+	 * @param passenger：
+	 *            新用户信息；
+	 * @return 注册登录后的用户；
+	 */
+	public JSONObject register(String mobile, String pwd, String openId, String channel) throws Exception {
+		// 注册
+		Map<String, String> postParam = new HashMap<String, String>();
+		postParam.put("nickName", mobile);
+		postParam.put("telephone", mobile);
+		postParam.put("passWord", pwd);
+		String result = PostHttpClient.sendPost(PropertiesConfig.API_SERVER_URL + REGISTER_API, postParam);
+		JSONObject resultData = JSONObject.fromObject(result);
+		String status = resultData.getString("a1");
+		if (status.equals("0")) {
+			//throw new Exception("registerFailure");
+		}
+		JSONObject user = getByPassword(mobile, pwd, openId);
+		bindOpenId(channel, user.getString("a2"), openId);
+		return user;
+	}
+
+	/**
+	 * 根据code获取用户的OpenId
+	 * 
+	 * @param code
+	 * @return loadOpenIdFromWechat :
+	 *         https://api.weixin.qq.com/sns/oauth2/access_token?appid=
+	 *         wxe30d761e0366b89f&secret=a9b9e2fc0ae1f2d447a69ccbf1fe2657&code=
+	 *         0212be95ca34eae0987ce58562ed7a2i&grant_type=authorization_code
+	 *         {"access_token":
+	 *         "OezXcEiiBSKSxW0eoylIeAmiPDNX_vTpwGmQYA9KCPE-KrjdI26HtZoFFw13oDTyLbb-5u7EnE6SBLrWf5gMdeBtlWrCW8GME0uni_Fe46-o9RYjf2dxB9iz2fL1MbJ96-VUkjonz6B5jxqQGXaKrQ"
+	 *         ,"expires_in":7200,"refresh_token":
+	 *         "OezXcEiiBSKSxW0eoylIeAmiPDNX_vTpwGmQYA9KCPE-KrjdI26HtZoFFw13oDTywkRyo_N1Aq_G8yZpu9zX5Mxshg1ON1C7OwJePV2nVC3KaA5KYSZI8lHnP2tfFRvXuIQ4R0MYoSRl19gnUqIJfw"
+	 *         ,"openid":"oT6aMs0bEGlo-xZ7REx88UZMClz8","scope":"snsapi_base"}
+	 *         https://api.weixin.qq.com/sns/userinfo?access_token=
+	 *         OezXcEiiBSKSxW0eoylIeAmiPDNX_vTpwGmQYA9KCPE-
+	 *         KrjdI26HtZoFFw13oDTyLbb-5u7EnE6SBLrWf5gMdeBtlWrCW8GME0uni_Fe46-
+	 *         o9RYjf2dxB9iz2fL1MbJ96-VUkjonz6B5jxqQGXaKrQ&openid=oT6aMs0bEGlo-
+	 *         xZ7REx88UZMClz8&lang=zh_CN {"errcode":48001,"errmsg":
+	 *         "req id: WgEhga0621ns57, api unauthorized"}
+	 *         https://api.weixin.qq.com/cgi-bin/user/info?access_token=
+	 *         DifaIcEqFC0f3F7giuoJt7BJJpYgfwmq9A0Vzov6QjbuJGQVXL3m1w0DF0_0G-
+	 *         YqpD4Un1NRECCirc7A9BSNYC2cFAjXN1LiLZOqfryGRy8&openid=oT6aMs0bEGlo
+	 *         -xZ7REx88UZMClz8&lang=zh_CN
+	 *         {"subscribe":1,"openid":"oT6aMs0bEGlo-xZ7REx88UZMClz8","nickname"
+	 *         :"Sin","sex":1,"language":"zh_CN","city":"æé³","province":
+	 *         "åäº¬","country":"ä¸­å½","headimgurl":
+	 *         "http://wx.qlogo.cn/mmopen/tQK90BGJeK5BrmtHn8vAUgxicr09sRcX6oOTMkzFoEIWozvia9ibWse2a58dOp8Cwc2sljKqU03hdpoglJvTs3oHnIeSeFxl5Dq/0"
+	 *         ,"subscribe_time":1443097467,"remark":"","groupid":0}
+	 */
+	public String loadOpenIdFromWechat(String code) {
+		System.out.println("loadOpenIdFromWechat : ");
+		StringBuffer url = new StringBuffer();
+		url.append(WeixinConstants.WEIXIN_GET_USER_OPENID_PRE);
+		url.append(code);
+		url.append(WeixinConstants.WEIXIN_GET_USER_OPENID_AFTER);
+		System.out.println(url.toString());
+		// 若会话中没有OpenId，则根据令牌获取 根据微信授权码获取微信用户Id和微信令牌
+		String result = PostHttpClient.getHttpReq(url.toString());
+		if (!StringUtils.isEmpty(result)) {
+			JSONObject json = JSONObject.fromObject(result);
+			System.out.println(json);
+			if (!json.containsKey("access_token") || !json.containsKey("openid"))
+				return null;
+			String openId = json.getString("openid");
+			String accessToken = json.getString("access_token");
+			url.setLength(0);
+			url.append("https://api.weixin.qq.com/sns/userinfo?access_token=");
+			url.append(accessToken);
+			url.append("&openid=");
+			url.append(openId);
+			url.append("&lang=zh_CN");
+
+			System.out.println(url.toString());
+			result = PostHttpClient.getHttpReq(url.toString());
+			json = JSONObject.fromObject(result);
+			System.out.println(json);
+
+			String weixinToken = WeixinContentUtil.getWeixinToken();
+			url.setLength(0);
+			url.append("https://api.weixin.qq.com/cgi-bin/user/info?access_token=");
+			url.append(weixinToken);
+			url.append("&openid=");
+			url.append(openId);
+			url.append("&lang=zh_CN");
+			System.out.println(url.toString());
+			result = PostHttpClient.getHttpReq(url.toString());
+			json = JSONObject.fromObject(result);
+			System.out.println(json);
+
+			return openId;
+		}
+		return null;
+	}
+
+	public Map<String, String> loadUserFullInfoFromWeChat(String code) throws UnsupportedEncodingException {
+		String url = WeixinConstants.WEIXIN_GET_USER_OPENID_PRE + code + WeixinConstants.WEIXIN_GET_USER_OPENID_AFTER;
+		String result = PostHttpClient.getHttpReq(url);
+		String openId = null;
+		Map<String, String> data = new HashMap<String, String>();
+		if (!StringUtils.isEmpty(result)) {
+			JSONObject json = JSONObject.fromObject(result);
+			if (json.containsKey("openid")) {
+				openId = json.getString("openid");
+				data.put("openId", openId);
+			}
+			if (!StringUtils.isEmpty(openId)) {
+				String accessToken = null;
+				if (json.containsKey("access_token")) {
+					accessToken = json.getString("access_token");
+				}
+				url = WeixinConstants.WEIXIN_GET_USER_INFO_URL + "&openid=" + openId + "&access_token=" + accessToken;
+				Map<String, Object> dataMap = new HashMap<String, Object>();
+				dataMap = PostHttpClient.postHttpXMLReq(url, null);
+				result = (String) dataMap.get("responseMsg");
+				json = JSONObject.fromObject(result);
+				String nickName = null;
+				nickName = new String(json.getString("nickname").getBytes(), "utf-8");
+				data.put("nickname", nickName);
+			}
+		}
+		return data;
+	}
+
+	/** md5的处理； */
+	private String toMd5(String str) {
+		try {
+			MessageDigest md = MessageDigest.getInstance("MD5");
+			md.update(str.getBytes());
+			byte[] md5 = md.digest();
+			StringBuffer hexValue = new StringBuffer();
+			for (int i = 0; i < md5.length; i++) {
+				int val = ((int) md5[i]) & 0xff;
+				if (val < 16) {
+					hexValue.append("0");
+				}
+				hexValue.append(Integer.toHexString(val));
+			}
+			return hexValue.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+}

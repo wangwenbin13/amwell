@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mapper.fcz.FczHelperMapper">
+	<!-- Result Map-->
+	<resultMap id="BaseResultMap" type="com.bean.fcz.FczHelper">
+		<result column="storeId" property="storeId" />
+		<result column="ownerOpenId" property="ownerOpenId" />
+		<result column="helperOpenId" property="helperOpenId" />
+		<result column="nickname" property="nickname" />
+		<result column="photoImage" property="photoImage" />
+		<result column="point" property="point" />
+		<result column="helpTime" property="helpTime" />
+	</resultMap>
+
+
+	<sql id="Base_Column_List">
+		storeId,ownerOpenId,helperOpenId,nickname,photoImage,point,helpTime
+	</sql>
+
+	<sql id="Update_Column_List">
+		<trim suffixOverrides=",">
+			<if test="ownerOpenId != null  and ownerOpenId != '' ">
+				ownerOpenId=#{ownerOpenId},
+	        </if>
+			<if test="helperOpenId != null  and helperOpenId != '' ">
+				helperOpenId=#{helperOpenId},
+	        </if>
+			<if test="nickname != null  and nickname != '' ">
+				nickname=#{nickname},
+	        </if>
+			<if test="photoImage != null  and photoImage != '' ">
+				photoImage=#{photoImage},
+	        </if>
+			<if test="point != null and point !=0 ">
+				point=#{point},
+	        </if>
+			<if test="helpTime != null  and helpTime != '' ">
+				helpTime=#{helpTime},
+	        </if>
+		</trim>
+	</sql>
+
+	<!-- 查询条件 -->
+	<sql id="Where_Clause">
+		<trim suffixOverrides=",">
+			<if test="storeId != null  and storeId != '' ">
+				and storeId=#{storeId}
+	        </if>
+			<if test="ownerOpenId != null  and ownerOpenId != '' ">
+				and ownerOpenId=#{ownerOpenId}
+	        </if>
+			<if test="helperOpenId != null  and helperOpenId != '' ">
+				and helperOpenId=#{helperOpenId}
+	        </if>
+			<if test="nickname != null  and nickname != '' ">
+				and nickname=#{nickname}
+	        </if>
+			<if test="photoImage != null  and photoImage != '' ">
+				and photoImage=#{photoImage}
+	        </if>
+			<if test="point != null and point !=0">
+				and point=#{point}
+	        </if>
+			<if test="helpTime != null  and helpTime != '' ">
+				and helpTime=#{helpTime}
+	        </if>
+		</trim>
+	</sql>
+
+	<insert id="add" parameterType="Object">
+		insert into fcz_helper(
+		<include refid="Base_Column_List" />
+		)
+		values(#{storeId},#{ownerOpenId},#{helperOpenId},#{nickname},#{photoImage},#{point},#{helpTime})
+	</insert>
+
+	<update id="update" parameterType="Object">
+		update fcz_helper set
+		<include refid="Update_Column_List" />
+		where storeId=#{storeId}
+	</update>
+
+	<delete id="delete" parameterType="Object">
+		delete from fcz_helper where 1=1
+		<include refid="Where_Clause" />
+	</delete>
+
+	<select id="list" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from fcz_helper
+		where 1=1
+		<include refid="Where_Clause" />
+		order by point desc
+	</select>
+
+
+	<select id="get" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from fcz_helper
+		where 1=1
+		<include refid="Where_Clause" />
+	</select>
+
+</mapper>   

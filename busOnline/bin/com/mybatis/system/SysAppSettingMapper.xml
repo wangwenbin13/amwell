@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mapper.system.SysAppSettingMapper">
+	<!-- Result Map-->
+	<resultMap id="BaseResultMap" type="com.bean.system.SysAppSetting">
+		<result column="settingId" property="settingId" />
+		<result column="orderValiteTime" property="orderValiteTime" />
+		<result column="maxTickets" property="maxTickets" />
+		<result column="maxDays" property="maxDays" />
+		<result column="maxMonths" property="maxMonths" />
+		<result column="createBy" property="createBy" />
+		<result column="createOn" property="createOn" />
+		<result column="updateBy" property="updateBy" />
+		<result column="updateOn" property="updateOn" />
+		<result column="WXreply" property="WXreply" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		settingId,orderValiteTime,maxTickets,maxDays,maxMonths,createBy,createOn,updateBy,updateOn,WXreply
+	</sql>
+
+	<sql id="Update_Column_List">
+		<trim suffixOverrides=",">
+			<if test="settingId != null  and settingId != '' ">
+				settingId=#{settingId},
+	        </if>
+			<if test="orderValiteTime != null  and orderValiteTime != '' ">
+				orderValiteTime=#{orderValiteTime},
+	        </if>
+			<if test="maxTickets != null  and maxTickets != '' ">
+				maxTickets=#{maxTickets},
+	        </if>
+			<if test="maxDays != null  and maxDays != '' ">
+				maxDays=#{maxDays},
+	        </if>
+			<if test="maxMonths != null  and maxMonths != '' ">
+				maxMonths=#{maxMonths},
+	        </if>
+			<if test="createBy != null  and createBy != '' ">
+				createBy=#{createBy},
+	        </if>
+			<if test="createOn != null  and createOn != '' ">
+				createOn=#{createOn},
+	        </if>
+			<if test="updateBy != null  and updateBy != '' ">
+				updateBy=#{updateBy},
+	        </if>
+			<if test="updateOn != null  and updateOn != '' ">
+				updateOn=#{updateOn},
+	        </if>
+	        <if test="WXreply!=null and WXreply!=''">
+	            WXreply=#{WXreply},
+	        </if>
+		</trim>
+	</sql>
+
+	<!-- 查询条件 -->
+	<sql id="Where_Clause">
+		<trim suffixOverrides=",">
+			<if test="settingId != null  and settingId != '' ">
+				and settingId=#{settingId}
+	        </if>
+			<if test="orderValiteTime != null  and orderValiteTime != '' ">
+				and orderValiteTime=#{orderValiteTime}
+	        </if>
+			<if test="maxTickets != null  and maxTickets != '' ">
+				and maxTickets=#{maxTickets}
+	        </if>
+			<if test="maxDays != null  and maxDays != '' ">
+				and maxDays=#{maxDays}
+	        </if>
+			<if test="maxMonths != null  and maxMonths != '' ">
+				and maxMonths=#{maxMonths}
+	        </if>
+			<if test="createBy != null  and createBy != '' ">
+				and createBy=#{createBy}
+	        </if>
+			<if test="createOn != null  and createOn != '' ">
+				and createOn=#{createOn}
+	        </if>
+			<if test="updateBy != null  and updateBy != '' ">
+				and updateBy=#{updateBy}
+	        </if>
+			<if test="updateOn != null  and updateOn != '' ">
+				and updateOn=#{updateOn}
+	        </if>
+	        <if test="WXreply!=null and WXreply!=''">
+	            and WXreply=#{WXreply}
+	        </if>
+		</trim>
+	</sql>
+
+	<!-- 插入记录 -->
+	<insert id="add" parameterType="Object">
+		insert into sys_app_setting(
+		<include refid="Base_Column_List" />
+		)
+		values(#{settingId},#{orderValiteTime},#{maxTickets},#{maxDays},#{maxMonths},#{createBy},#{createOn},#{updateBy},#{updateOn},#{WXreply})
+	</insert>
+
+	<!-- 修改记录-->
+	<update id="update" parameterType="Object">
+		update sys_app_setting
+		<include refid="Update_Column_List" />
+		where settingId=#{settingId}
+	</update>
+
+	<!-- 删除记录 -->
+	<delete id="delete" parameterType="Object">
+		delete from sys_app_setting where 1=1
+		<include refid="Where_Clause" />
+	</delete>
+
+	<!-- 根据用户名来得到用户登录信息 -->
+	<select id="list" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from sys_app_setting
+		where 1=1
+		<include refid="Where_Clause" />
+	</select>
+
+	<!-- 根据用户名来得到用户登录信息 -->
+	<select id="get" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from sys_app_setting
+		where 1=1
+		<include refid="Where_Clause" />
+	</select>
+</mapper>   

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mapper.fcz.FczAccessTokenMapper">
+	<!-- Result Map-->
+	<resultMap id="BaseResultMap" type="com.bean.fcz.FczAccessToken">
+		<result column="storeId" property="storeId" />
+		<result column="access_token" property="access_token" />
+		<result column="js_api_token" property="js_api_token" />
+		<result column="updateTime" property="updateTime" />
+	</resultMap>
+
+
+	<sql id="Base_Column_List">
+		storeId,access_token,js_api_token,updateTime
+	</sql>
+
+	<sql id="Update_Column_List">
+		<trim suffixOverrides=",">
+			<if test="storeId != null  and storeId != '' ">
+				storeId=#{storeId},
+	        </if>
+			<if test="access_token != null  and access_token != '' ">
+				access_token=#{access_token},
+	        </if>
+	        <if test="js_api_token != null  and js_api_token != '' ">
+				js_api_token=#{js_api_token},
+	        </if>
+	         <if test="updateTime != null">
+				updateTime=#{updateTime},
+	        </if>
+		</trim>
+	</sql>
+
+	<!-- 查询条件 -->
+	<sql id="Where_Clause">
+		<trim suffixOverrides=",">
+			<if test="storeId != null  and storeId != '' ">
+				and storeId=#{storeId}
+	        </if>
+			<if test="access_token != null  and access_token != '' ">
+				and access_token=#{access_token}
+	        </if>
+	        <if test="js_api_token != null  and js_api_token != '' ">
+				and js_api_token=#{js_api_token}
+	        </if>
+		</trim>
+	</sql>
+
+	<insert id="add" parameterType="Object">
+		insert into fcz_access_token(
+		<include refid="Base_Column_List" />
+		)
+		values(#{storeId},#{access_token},#{js_api_token},#{updateTime})
+	</insert>
+
+	<update id="update" parameterType="Object">
+		update fcz_access_token set
+		<include refid="Update_Column_List" />
+		where storeId=#{storeId}
+	</update>
+
+	<delete id="delete" parameterType="Object">
+		delete from fcz_access_token where 1=1
+		<include refid="Where_Clause" />
+	</delete>
+
+	<select id="list" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from fcz_access_token
+		where 1=1
+		<include refid="Where_Clause" />
+	</select>
+
+
+	<select id="get" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from fcz_access_token
+		where 1=1
+		<include refid="Where_Clause" />
+	</select>
+
+</mapper>   

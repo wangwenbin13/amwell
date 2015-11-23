@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+	<mappers>
+		<!--APP设置信息-->
+		<mapper resource="com/mybatis/system/SysAppSettingMapper.xml" />
+
+		<!-- 微信用户关注记录 -->
+		<mapper resource="com/mybatis/weixin/SubscribeRecordMapper.xml" />
+		
+		<!-- 刮奖活动 -->
+		<mapper resource="com/mybatis/games/ImpossibleInfoMapper.xml" />
+		<mapper resource="com/mybatis/games/ImpossibleMapper.xml" />
+		
+		<mapper resource="com/mybatis/games/fcz/FczSettingMapper.xml" />
+		<mapper resource="com/mybatis/games/fcz/FczOwnerMapper.xml" />
+		
+	</mappers>
+</configuration>

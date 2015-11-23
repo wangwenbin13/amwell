@@ -1,0 +1,25 @@
+apply plugin:'war'
+apply plugin:'eclipse-wtp'
+
+repositories {
+    mavenCentral()
+}
+
+webAppDirName = 'WebRoot'
+sourceSets {
+   main {
+       java.srcDirs = ['src']
+       resources.srcDirs = ['src']
+   }
+}
+
+dependencies {
+    
+	
+    providedCompile 'javax.servlet:javax.servlet-api:3.0.1'
+    providedCompile fileTree(dir: "${webAppDirName}/WEB-INF/lib", include: '*.jar')
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}

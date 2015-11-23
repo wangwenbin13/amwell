@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<account-list>
+	<account>
+		<account-name>租车在线（测试）</account-name>
+		<appId>wx5825150f69a49413</appId>
+		<appSecret>f60ef74a86e86dd0db4af27792016868</appSecret>
+		<partnerId>10026331</partnerId>
+		<partnerSecret>4fb75662c0a8068101ef9f1de842268e</partnerSecret>
+		<paySignKey>188284c6887b8ce54f81c1ec2e189e42</paySignKey>
+	</account>
+
+	<account>
+		<account-name>小猪巴适（生产）</account-name>
+		<appId>wx6f7e049b0596bd6b</appId>
+		<appSecret>87c973c477d745d5f95b88e84f8c9579</appSecret>
+		<partnerId>1220365101</partnerId>
+		<partnerSecret>71b00d23cce9a57bd6f6302cd5fb5410</partnerSecret>
+		<paySignKey>AXYSCs8qrUeWPnUAiodJnUIbgG7lBXN2WSNtxIVZPLPrnhaPxPMvXoqLoIP3nhQ0Y2AbVUJUdpC20c2NGYepHngWUxvQgFRVaWRBI0iRCYLZBnoONrKh310c0uZmYxwg
+		</paySignKey>
+	</account>
+</account-list>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta content="yes" name="apple-mobile-web-app-capable">
+	<meta content="yes" name="apple-touch-fullscreen">
+	<meta content="telephone=no" name="format-detection">
+	<meta content="black" name="apple-mobile-web-app-status-bar-style">
+	<meta name="viewport" content="initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+	<title>上班者联盟-结果页面</title>
+	<link rel="stylesheet" type="text/css" href="../../css/fcz.css">
+</head>
+<body class="grayBg">
+	<article>
+		<div class="main">
+			 <!--击打结果 atart-->
+            <div class="gameResulteOut" style="display:none">
+                <div class="gameResulte">
+                    <!--头像变灰 追加样式gray,去掉则头像变亮-->
+                    <span class="resulteItem"></span>
+                    <span class="resulteItem gray"></span>
+                    <span class="resulteItem gray"></span>  
+                </div>
+                <p class="mt15 yellow">我打了BOSS 50拳，超过了</p>
+                <p class="yellow">60％的同行，获得妇联小队长称号！</p> 
+                <a href="" class="rBtn">再来一次</a>
+                <a href="" class="rBtn">兑换奖品</a>
+            </div>
+            <!--击打结果 end-->
+            <!--兑完奖后 atart-->
+            <div class="gameResulteOutGift">
+                <span class="giftEle shouban"></span>
+                <span class="giftEle huafei"></span>
+                <span class="giftEle busquan"></span>
+                <p>你的小伙伴已成功兑换奖品复仇者联盟手办</p>
+                <p>（奖品发放事宜敬请留意小猪巴士微信公众号）</p>
+            </div>
+            <!--兑完奖后 end-->
+            <!--排行榜 start-->
+            <section>
+            	<div class="resulteList">
+                	<h2 class="rTitle">____联盟战力排行榜____</h2>
+                    <p>累计拳数：490</p>
+                    <ul class="resulteList-item ">
+                    	<li class="clearfix">
+                        	<span class="time">2015.5.18&nbsp;&nbsp;10:00</span>
+                        	<img src="images/indexTopBg1.jpg">
+                            <span class="user"><em>愤怒的可乐</em> 帮我打了70拳</span>
+                        </li>
+                        <li class="clearfix">
+                        	<span class="time">2015.5.18&nbsp;&nbsp;10:00</span>
+                        	<img src="images/indexTopBg1.jpg">
+                            <span class="user"><em>愤怒的可乐</em> 帮我打了70拳</span>
+                        </li>
+                        <li class="clearfix">
+                        	<span class="time">2015.5.18&nbsp;&nbsp;10:00</span>
+                        	<img src="images/logo.png">
+                            <span class="user"><em>愤怒的可乐</em> 帮我打了70拳</span>
+                        </li>
+                        <li class="clearfix">
+                        	<span class="time">2015.5.18&nbsp;&nbsp;10:00</span>
+                        	<img src="images/logo.png">
+                            <span class="user"><em>愤怒的可乐愤怒的可乐</em> 帮我打了70拳</span>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+            <!--排行榜 end-->
+		</div>
+	</article>
+    <!-- 兑奖弹窗 start-->
+    <div class="boxOut" style="display:none">
+    	<div class="boxDiv boxDivBgBlue">
+        	<a href="javascript:void(0);" class="close"></a>
+        	<div class="box boxBgBlue">
+            	<div class="radioBox">
+                	<p><input type="radio" />20元小猪巴士乘车劵</p>
+                    <p><input type="radio" />30元手机话费</p>
+                    <p><input type="radio" />复联英雄手办</p>
+                </div>
+                <a href="javascript:void(0);" class="bBtn">兑换</a>
+                <a href="javascript:void(0);" class="bBtn ml15 bBtnS">我要继续</a>
+            </div>
+        </div>
+    </div>
+ <!-- 兑奖弹窗 end-->
+ <!-- 体力用完弹窗 start-->
+    <div class="boxOut" style="display:none">
+    	<div class="boxDiv boxDivBgGray">
+        	<a href="javascript:void(0);" class="close"></a>
+        	<div class="box boxBgGray">
+            	<div class="noTips">
+                    <div class="noTipsList">
+                    	<p>你的体力已用完</p>
+                        <p>联盟好友来帮忙</p>
+                        <p>（分享给好友即可）</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+ <!-- 体力用完弹窗 end-->
+  <!-- 输入手机号码弹窗 start-->
+    <div class="boxOut">
+        <div class="boxDiv boxDivBgYellow p-r">
+            <a href="javascript:void(0);" class="close"></a>
+            <div class="box boxBgYellow  p-r">
+                <p class="f18 white">输入手机号码，体力倍增</p>
+                <p><input type="number" /></p>
+                <p><input type="submit" class="telBtn" /></p>
+            </div>
+        </div>
+    </div>
+ <!-- 输入手机号码弹窗 end-->
+</body>
+</html>

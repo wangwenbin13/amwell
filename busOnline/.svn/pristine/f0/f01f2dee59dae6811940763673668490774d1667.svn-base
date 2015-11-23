@@ -1,0 +1,213 @@
+html,body,section,p,h1,h2,h3,h4,h5,h6 {
+      margin: 0 0;
+      padding: 0 0;
+}
+img {
+      display: block;
+      max-width: 100%;
+}
+*[hidden] {
+	display: none;
+}
+
+
+html {
+	font-size: 14px;
+	height: 100%;
+	width: 100%;
+}
+
+body {
+	background: #ffecc6;
+	text-align: center;
+	margin: 0 auto;
+	font-family: sans-serif;
+	min-width: 320px;
+	min-height: 370px;
+	height: 100%;
+	width: 100%;
+}
+section {
+	max-width: 640px;
+	margin: 0 auto;
+}
+p {
+  vertical-align: middle;
+}
+div {
+      margin: 0 auto;
+}
+.clears {
+      clear: both;
+}
+.btn {
+  width: 50%;
+  border: 1px solid #4e4440;
+  border-radius: 6px 6px;
+  background: #fff;
+  font-size: 1.6rem;
+  margin: 0.5rem 0;
+}
+.follow {
+	padding: 0.5rem 0;
+}
+
+
+#index {
+}
+#index h1 {
+	padding: 1rem 0;
+}
+#index .dot {
+  width: 6px;
+  height: 6px;
+  display: inline-block;
+  border: 1px solid;
+  border-radius: 50% 50%;
+  margin: 1rem;
+}
+#index .middle {
+  width: 70%;
+  text-align: left;
+}
+#index .middle p {
+	width: 3rem;
+}
+#index .middle .imgs {
+	float: right;
+    width: 60%;
+}
+@media (min-height: 400px) {
+	#index h1 {
+		padding: 1.5rem 0;
+	}
+	#index .dot {
+	  margin: 1rem;
+	}
+	#index .middle {
+		margin-top: 1rem;
+	}
+}
+@media (min-height: 510px) {
+	#index h1 {
+		padding: 1.5rem 0;
+	}
+	#index .dot {
+	  margin: 1rem;
+	}
+	#index .middle {
+		margin: 2rem auto 1rem;
+	}
+}
+@media (min-height: 700px) {
+	#index h1 {
+		padding: 2rem 0;
+	}
+	#index .dot {
+	  margin: 1rem;
+	}
+	#index .middle {
+		margin: 3rem auto 2rem;
+	}
+}
+
+
+
+#test {
+
+}
+#test h2 {
+	padding: 1rem 0;
+}
+#test label {
+	display: inline-block;
+	width: 40%;
+}
+#test label input {
+	float: left;
+}
+#test label img {
+	width: 80%;
+}
+
+
+#result {
+	padding: 0 10%;
+}
+#result h3 {
+	padding-top: 2rem;
+}
+#result .al-title {
+	width: 8rem;
+	margin: 1rem auto 0;
+	font-size: 1.5rem;
+	border: 1px solid;	
+	font-weight: bold;
+}
+#result .share {
+	box-sizing: border-box;
+	width: 8rem;
+	padding: 0 0;
+}
+
+#result .middle {
+	border: 1px solid #0e050a;
+	margin: 1rem auto 1rem;
+}
+#result .al-desc1 {
+	width: 15rem;
+	text-align: left;
+	margin: 2rem auto;
+	line-height: 1.3rem;
+	font-weight: bold;
+}
+#result .als {
+	width: 15rem;
+	margin: 3rem auto 0;
+}
+#result .al-desc2 {
+	font-size: 0.6rem;
+	width: 6rem;
+	text-align: left;
+	float: right;
+	line-height: 1.5rem;
+}
+#result .als .imgs {
+	width: 9rem;
+	margin-left: 0px;
+	margin-top: -3rem;
+}
+#result .follow {
+	text-align: left;
+}
+
+
+#share-layout {
+	position: absolute;
+	top: 0;
+	z-index: 99;
+	text-align: center;
+	left: 50%;
+	margin-left: -40%;
+	display: none;
+	width: 80%;
+}
+#share-layout .iknow {
+	border-radius: 50% 50%;
+	text-align: center;
+	width: 100px;
+	height: 100px;
+	background: #fff1d3;
+	margin-top: 15px;
+}
+
+
+#model {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	display: none;
+	z-index: 9;
+	background: #000;
+	opacity: 0.8;
+}

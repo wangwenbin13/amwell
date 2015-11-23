@@ -1,0 +1,8 @@
+* { padding: 0; margin: 0; }
+a { text-decoration: none; }
+address,caption,cite,code,dfn,em,strong,th,var { font-weight: normal; font-style: normal; }
+body { font-size: 12px; font-family:"微软雅黑", "Helvetica Neue", Helvetica, STHeiTi, Arial, sans-serif; -webkit-text-size-adjust:none; background: url(http://img.pig84.com/download/100000000005); background-size: 100%; overflow: hidden; }
+input[type="search"] {-webkit-appearance:none; }
+body.none { background: none; }
+body.fuzzy { background: url(http://img.pig84.com/download/100000000004); background-size: 100%; }
+*:focus { outline: none; }

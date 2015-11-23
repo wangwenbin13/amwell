@@ -1,0 +1,119 @@
+package com.action.games;
+
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.ModelAndView;
+
+import com.commons.utils.StringUtils;
+import com.service.games.AnniversaryService;
+import com.service.v1.OrderService;
+import com.service.v1.UserService;
+import com.util.constants.PropertiesConfig;
+import com.util.constants.WebServiceConstants;
+import com.util.weixin.MessageUtil;
+import com.util.weixin.WeixinMenuUtil;
+
+/**
+ *  /\_/\
+ * (=+_+=)
+ *   ( ).
+ * @author sunjiaxiang
+ * 貌似这是一个提供各种和用户有关接口处理的类哟。
+ */
+@Controller
+@RequestMapping("/games/anniversary")
+public class AnniversaryAction {
+	
+	@Autowired
+	private UserService userService;
+	
+	@Autowired
+	private OrderService orderService;
+	
+	@Autowired
+	private AnniversaryService anniversaryService;
+	
+	/**
+	 * 前往个人中心页面
+	 * 微信相关
+	 * @param code 微信授权码
+	 * 第三方合作相关
+	 * @param client_id: 第三方合作用的渠道ID;
+	 * @param access_token: 第三方合作用的用户唯一标识;
+	 * @param client_id: 第三方合作用的手机号码;
+	 * @throws IOException 
+	 * @throws UnsupportedEncodingException 
+	 */
+	@RequestMapping(value = "/index", produces = { "text/html;charset=utf-8" })
+	public ModelAndView index(String code, String client_id, String access_token, String mobile, String singnature, 
+			HttpServletRequest request, HttpServletResponse response) throws UnsupportedEncodingException, IOException {
+
+		ModelAndView mv = new ModelAndView("games/anniversary");
+		if (!userService.initUserInfo(code, client_id, access_token, singnature, mv) && !StringUtils.isEmpty(code)) {
+			response.sendRedirect(WeixinMenuUtil.getWeixinMenuDirectURL(PropertiesConfig.SERVER_IP + PropertiesConfig.PROJECT_NAME + "/games/anniversary/index"));
+			return null;
+		}
+		// 初始化所在城市
+		mv.addObject("code", code);
+		return mv;
+	}
+	
+	@RequestMapping(value = "/buyTicket", produces = { "text/html;charset=utf-8" })
+	public ModelAndView buy(String uid, String openId) {
+		ModelAndView mv;
+		if (anniversaryService.checkBuy(uid)) {
+			mv = new ModelAndView("games/showticket");
+			mv.addObject("code", PropertiesConfig.TICKET_CODE);
+		} else {
+			mv = new ModelAndView("games/buyticket");
+			mv.addObject("isActivate", anniversaryService.isAcitvity());
+			mv.addObject("openId", openId);
+		}
+		return mv;
+	}
+	
+	/**
+	 * 购票的接口；
+	 * @param uid: 用户ID
+	 * @param tel: 手机号码
+	 * @param openId: 微信标识ID
+	 */
+	@RequestMapping(value = "/buy", produces = { "text/html;charset=utf-8" })
+	@ResponseBody
+	public String buy(String uid, String openId,
+			HttpServletRequest request, HttpServletResponse response) {
+		try {
+			return orderService.handleGenParam("小猪周年", uid, 9.9,
+					WebServiceConstants.WEIXIN_ANNNOTIFY_URL, openId, request, response).toString(2);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	@RequestMapping("/payNotifyUrl")
+	public void payNotifyUrl(HttpServletRequest request, HttpServletResponse response) throws Exception {
+		Map<String, String> dataMap = MessageUtil.parseXml(request);
+		String return_code = dataMap.get("return_code");
+System.out.println("handlePayNotifyV3 return_code : " + return_code);
+		// 判断签名及结果
+		if (return_code != null && "SUCCESS".equals(return_code)) {
+			String result_code = dataMap.get("result_code");
+System.out.println("handlePayNotifyV3 : result_code : " + result_code);
+			if (result_code != null && result_code.equals("SUCCESS")) {
+				// 商户订单号
+				String out_trade_no = dataMap.get("out_trade_no");
+				anniversaryService.success(out_trade_no);
+			}
+		}
+	}
+}

@@ -1,0 +1,258 @@
+package com.util.weixin;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.SortedMap;
+
+import net.sf.json.JSONObject;
+
+import org.apache.commons.lang.StringUtils;
+import org.dom4j.Document;
+import org.dom4j.DocumentException;
+import org.dom4j.Element;
+import org.dom4j.io.SAXReader;
+
+import com.util.common.PostHttpClient;
+import com.util.constants.PropertiesConfig;
+
+/**
+ * 微信内容工具类
+ * 
+ * @author shawn.zheng
+ * 
+ */
+public class WeixinContentUtil {
+	
+	// 微信的通信access_token
+	private static String WEIXIN_TOKEN;
+	// 微信的token过期时间，如果当前时间超过了这个时间1小时就会再去去
+	private static long WEIXIN_LAST_TIME = -1;
+	
+	/**
+	 * 获取微信的token;
+	 * @return
+	 */
+	public static String getWeixinToken() {
+		long curTime = System.currentTimeMillis();
+		if (curTime - WEIXIN_LAST_TIME > 3600000) {
+			String url = WeixinConstants.WEIXIN_GET_ACCESS_TOKEN_URL;
+			String result = PostHttpClient.getHttpReq(url);
+			if (!StringUtils.isEmpty(result)) {
+				JSONObject jsonObject = JSONObject.fromObject(result);
+				if (jsonObject.containsKey("access_token"))
+					WEIXIN_TOKEN = jsonObject.getString("access_token");
+			}
+		}
+		return WEIXIN_TOKEN;
+	}
+	
+	/**
+	 * 创建文本回复消息
+	 * 
+	 * @param dataMap
+	 *            xml内容
+	 * @param content
+	 *            内容
+	 * @return
+	 */
+	public static String createTextMessage(Map<String, String> dataMap,String content) {
+		StringBuffer responseXML = new StringBuffer();
+		responseXML.append("<xml>");
+		responseXML.append("<ToUserName><![CDATA[" + dataMap.get("FromUserName") + "]]></ToUserName>");
+		responseXML.append("<FromUserName><![CDATA[" + dataMap.get("ToUserName") + "]]></FromUserName>");
+		responseXML.append("<CreateTime>" + dataMap.get("CreateTime") + "</CreateTime>");
+		responseXML.append("<MsgType><![CDATA[text]]></MsgType>");
+		responseXML.append("<Content><![CDATA[" + content + "]]></Content>");
+		responseXML.append("</xml>");
+		return responseXML.toString();
+	}
+
+	/**
+	 * 创建客服通知消息
+	 * 
+	 * @param fromUser
+	 *            用户id
+	 * @param toUser
+	 *            公众号id
+	 * @param createTime
+	 *            消息时间
+	 * @return String
+	 */
+	public static String createCustomServiceMessage(Map<String, String> dataMap) {
+		StringBuffer responseXML = new StringBuffer();
+		responseXML.append("<xml>");
+		responseXML.append("<ToUserName><![CDATA[" + dataMap.get("FromUserName") + "]]></ToUserName>");
+		responseXML.append("<FromUserName><![CDATA[" + dataMap.get("ToUserName") + "]]></FromUserName>");
+		responseXML.append("<CreateTime>" + dataMap.get("CreateTime") + "</CreateTime>");
+		responseXML.append("<MsgType><![CDATA[transfer_customer_service]]></MsgType>");
+		responseXML.append("</xml>");
+		return responseXML.toString();
+	}
+	
+	/**
+	 * 创建下载app的文本回复
+	 * @return
+	 */
+	public static StringBuffer createDownloadAppMessage(){
+		StringBuffer content = new StringBuffer();
+		content.append("下载客户端请点击：\n\n");
+		content.append("<a href=\"" + PropertiesConfig.IOS_APP_DOWNLOAD_URL + "\">iPhone版</a>\n\n");
+		content.append("<a href=\"" + PropertiesConfig.ANDROID_APP_DOWNLOAD_URL + "\">Android版</a>\n\n");
+		return content;
+	}
+
+	/**
+	 * 创建微信帮助回复消息
+	 * 
+	 * @return
+	 * @throws UnsupportedEncodingException
+	 */
+	public static StringBuffer createHelpMessage()
+			throws UnsupportedEncodingException {
+		StringBuffer content = new StringBuffer();
+		content.append("这位同学，你迟到了。\n\n");
+		content.append("幸好，我们已经准备好了。\n\n");
+		content.append("小猪巴士定制上下班班车，提供一人一座、站少直达的点对点接送服务，已开通覆盖深圳五大区、服务8000人的60条线路啦！\n\n");
+		content.append("你可以在<a href=\"https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx6f7e049b0596bd6b&redirect_uri=http%3A%2F%2Fweixin.pig84.com%2FbusOnline%2Fv1%2Fline%2Fworkday&response_type=code&scope=snsapi_base&state=1#wechat_redirect\">【上下班巴士】</a>中找到你的线路；\n\n");
+		content.append("没有线路？！\n\n");
+		content.append("那就<a href=\"http://www.pig84.com/questionnaire/Questionnaire.action?theFrom=2\">【填写出行需求】</a>200辆班车总有一辆是你的。\n\n");
+		content.append("客服电话：4001681866\n");
+		return content;
+	}
+
+	public static StringBuffer createImageTextMessage(String fromUser,
+			String toUser, String createTime) {
+		StringBuffer responseXML = new StringBuffer();
+		responseXML.append("<xml>");
+		responseXML.append("<ToUserName><![CDATA[" + fromUser + "]]></ToUserName>");
+		responseXML.append("<FromUserName><![CDATA[" + toUser + "]]></FromUserName>");
+		responseXML.append("<CreateTime>" + createTime + "</CreateTime>");
+		responseXML.append("<MsgType><![CDATA[news]]></MsgType>");
+		responseXML.append("<ArticleCount>1</ArticleCount>");
+		responseXML.append("<Articles>");
+		responseXML.append("<item>");
+		responseXML.append("<Title><![CDATA[小猪全城礼物任性送！]]></Title> ");
+		responseXML.append("<Description><![CDATA[快来点击“我要礼物”参加活动吧！]]></Description>");
+		responseXML.append("<PicUrl><![CDATA[http://mmbiz.qpic.cn/mmbiz/N8hPceet5EibjQoIBmx22DiaSnawWvQIE0WbbN0vaWbDJQRBCjakDa1TjicUxVic6HnqvXWHgT2y9v1HE3qIib78MJg/640?tp=webp]]></PicUrl>");
+		responseXML.append("<Url><![CDATA[http://mp.weixin.qq.com/s?__biz=MzA4NjMwNDIzNA==&mid=202064042&idx=1&sn=1f53089f78d3ad72bc568c5ae2e48e07#rd]]></Url>");
+		responseXML.append("</item>");
+		responseXML.append("</Articles>");
+		responseXML.append("</xml>");
+		return responseXML;
+	}
+
+	/**
+	 * 生成请求XML
+	 * @param packageParams: 参数map
+	 * @return
+	 */
+	public static String createXML(SortedMap<String, String> packageParams) {
+		StringBuffer sb = new StringBuffer();
+		sb.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+		sb.append("<xml>");
+		Set<Entry<String, String>> es = packageParams.entrySet();
+		Iterator<Entry<String, String>> it = es.iterator();
+		while (it.hasNext()) {
+			Entry<String, String> entry = it.next();
+			String k = (String) entry.getKey();
+			String v = (String) entry.getValue();
+			if (!StringUtils.isEmpty(v) && !"appkey".equals(k) && !"body".equals(k)) {
+				sb.append("<");
+				sb.append(k);
+				sb.append(">");
+				sb.append(packageParams.get(k));
+				sb.append("</");
+				sb.append(k);
+				sb.append(">\n");
+			} else if ("body".equals(k)) {
+				sb.append("<");
+				sb.append(k);
+				sb.append(">");
+				sb.append("<![CDATA[");
+				sb.append(packageParams.get(k));
+				sb.append("]]>");
+				sb.append("</");
+				sb.append(k);
+				sb.append(">\n");
+			}
+		}
+		sb.append("</xml>");
+		return sb.toString();
+	}
+
+	/**
+	 * 解析xml
+	 * 
+	 * @param targetStr
+	 *            需要解析的xml字符串
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public static Map<String, String> parseXML(String targetStr) {
+		ByteArrayInputStream is = null;
+		try {
+			is = new ByteArrayInputStream(targetStr.getBytes("utf-8"));
+		} catch (UnsupportedEncodingException e3) {
+			e3.printStackTrace();
+		}
+		Map<String, String> map = new HashMap<String, String>();
+		SAXReader reader = new SAXReader();
+		Document document = null;
+		try {
+			document = reader.read(is);
+		} catch (DocumentException e2) {
+			e2.printStackTrace();
+		}
+		if (document != null) {
+			// 得到xml根元素
+			Element root = document.getRootElement();
+			// 得到根元素的所有子节点
+			List<Element> elementList = root.elements();
+			// 遍历所有子节点
+			for (Element e : elementList)
+				map.put(e.getName(), e.getText());
+		}
+		try {
+			if (is != null)
+				is.close();
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		is = null;
+		return map;
+	}
+
+	/**
+	 * 创建错误返回xml
+	 * 
+	 * @return String
+	 */
+	public static String createFailXml() {
+		StringBuffer failXml = new StringBuffer();
+		failXml.append("<xml>");
+		failXml.append("<return_code>FAIL</return_code>");
+		failXml.append("<return_msg>FAIL</return_code>");
+		failXml.append("</xml>");
+		return failXml.toString();
+	}
+
+	/**
+	 * 创建正确返回xml
+	 * 
+	 * @return
+	 */
+	public static String createSuccessXml() {
+		StringBuffer successXml = new StringBuffer();
+		successXml.append("<xml>");
+		successXml.append("<return_code>SUCCESS</return_code>");
+		successXml.append("</xml>");
+		return successXml.toString();
+	}
+}

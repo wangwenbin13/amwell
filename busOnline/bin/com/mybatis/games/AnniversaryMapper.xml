@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mapper.games.AnniversaryMapper">
+	<!-- Result Map-->
+	<resultMap id="BaseResultMap" type="com.bean.games.Anniversary">
+		<result column="uid" property="uid" />
+		<result column="tel" property="tel" />
+		<result column="createTime" property="createTime" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		uid,tel,createTime
+	</sql>
+
+	<!-- 插入记录 -->
+	<insert id="add" parameterType="Object">
+		insert into Anniversary(
+		<include refid="Base_Column_List" />
+		) values(#{uid},#{tel},#{createTime})
+	</insert>
+	
+	<select id="count" resultType="int">
+		select count(uid) from Anniversary
+	</select>
+	
+	<select id="getByUid" parameterType="String" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from Anniversary where uid=#{uid}
+	</select>
+	
+	<select id="getByIdAndTime" parameterType="map" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from Anniversary where uid=#{id} and createTime > #{time}
+	</select>
+</mapper>   

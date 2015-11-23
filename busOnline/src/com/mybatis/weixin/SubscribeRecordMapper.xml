@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mapper.weixin.SubscribeRecordMapper">
+	<!-- Result Map-->
+	<resultMap id="BaseResultMap" type="com.bean.weixin.SubscribeRecord">
+		<result column="storeId" property="storeId" />
+		<result column="openId" property="openId" />
+		<result column="createTime" property="createTime" />
+		<result column="subscribeNum" property="subscribeNum" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		storeId,openId,createTime,subscribeNum
+	</sql>
+
+	<sql id="Update_Column_List">
+		<trim suffixOverrides=",">
+			<if test="storeId != null  and storeId != '' ">
+				storeId=#{storeId},
+	        </if>
+			<if test="openId != null  and openId != '' ">
+				openId=#{openId},
+	        </if>
+			<if test="createTime != null  and createTime != '' ">
+				createTime=#{createTime},
+	        </if>
+			<if test="subscribeNum != null">
+				subscribeNum=#{subscribeNum},
+	        </if>
+		</trim>
+	</sql>
+
+	<!-- 查询条件 -->
+	<sql id="Where_Clause">
+		<trim suffixOverrides=",">
+			<if test="storeId != null  and storeId != '' ">
+				and storeId=#{storeId}
+	        </if>
+			<if test="openId != null  and openId != '' ">
+				and openId=#{openId}
+	        </if>
+			<if test="createTime != null  and createTime != '' ">
+				and createTime=#{createTime}
+	        </if>
+			<if test="subscribeNum != null">
+				and subscribeNum=#{subscribeNum}
+	        </if>
+		</trim>
+	</sql>
+
+	<!-- 插入记录 -->
+	<insert id="add" parameterType="Object">
+		insert into wx_subscribe_record(
+		<include refid="Base_Column_List" />
+		)
+		values(#{storeId},#{openId},#{createTime},#{subscribeNum})
+	</insert>
+
+	<!-- 修改记录-->
+	<update id="update" parameterType="Object">
+		update wx_subscribe_record set
+		<include refid="Update_Column_List" />
+		where storeId = #{storeId}
+	</update>
+
+	<!-- 删除记录 -->
+	<delete id="delete" parameterType="Object">
+		delete from wx_subscribe_record where 1=1
+		<include refid="Where_Clause" />
+	</delete>
+
+	<select id="list" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from wx_subscribe_record
+		where 1=1
+		<include refid="Where_Clause" />
+	</select>
+
+	<select id="get" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from wx_subscribe_record
+		where 1=1
+		<include refid="Where_Clause" />
+	</select>
+
+	<select id="getByOpenId" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from wx_subscribe_record
+		where openId=#{openId}
+	</select>
+</mapper>   

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mapper.games.fcz.FczOwnerMapper">
+	<!-- Result Map-->
+	<resultMap id="BaseResultMap" type="com.bean.games.fcz.FczOwner">
+		<result column="storeId" property="storeId" />
+		<result column="openId" property="openId" />
+		<result column="nickname" property="nickname" />
+		<result column="telephone" property="telephone" />
+		<result column="totalPoint" property="totalPoint" />
+		<result column="prideName" property="prideName" />
+		<result column="availablePlayNum" property="availablePlayNum" />
+		<result column="isShare" property="isShare" />
+	</resultMap>
+
+
+	<sql id="Base_Column_List">
+		storeId,openId,nickname,telephone,totalPoint,prideName,availablePlayNum,isShare
+	</sql>
+
+	<sql id="Update_Column_List">
+		<trim suffixOverrides=",">
+			<if test="openId != null  and openId != '' ">
+				openId=#{openId},
+	        </if>
+			<if test="nickname != null  and nickname != '' ">
+				nickname=#{nickname},
+	        </if>
+			<if test="telephone != null  and telephone != '' ">
+				telephone=#{telephone},
+	        </if>
+			<if test="totalPoint != null and totalPoint!=0">
+				totalPoint=#{totalPoint},
+	        </if>
+			<if test="prideName != null  and prideName != '' ">
+				prideName=#{prideName},
+	        </if>
+			<if test="availablePlayNum != null ">
+				availablePlayNum=#{availablePlayNum},
+	        </if>
+			<if test="isShare != null  and isShare != '' ">
+				isShare=#{isShare},
+	        </if>
+		</trim>
+	</sql>
+
+	<!-- 查询条件 -->
+	<sql id="Where_Clause">
+		<trim suffixOverrides=",">
+			<if test="storeId != null  and storeId != '' ">
+				and storeId=#{storeId}
+	        </if>
+	        <if test="openId != null  and openId != '' ">
+				and openId=#{openId}
+	        </if>
+			<if test="nickname != null  and nickname != '' ">
+				and nickname=#{nickname}
+	        </if>
+			<if test="telephone != null  and telephone != '' ">
+				and telephone=#{telephone}
+	        </if>
+			<if test="totalPoint != null and totalPoint !=0">
+				and totalPoint=#{totalPoint}
+	        </if>
+			<if test="prideName != null  and prideName != '' ">
+				and prideName=#{prideName}
+	        </if>
+			<if test="availablePlayNum != null and availablePlayNum!=0">
+				and availablePlayNum=#{availablePlayNum}
+	        </if>
+			<if test="isShare != null  and isShare != '' ">
+				and isShare=#{isShare}
+	        </if>
+		</trim>
+	</sql>
+
+	<insert id="add" parameterType="Object">
+		insert into fcz_owner(
+		<include refid="Base_Column_List" />
+		)
+		values(#{storeId},#{openId},#{nickname},#{telephone},#{totalPoint},#{prideName},#{availablePlayNum},#{isShare})
+	</insert>
+
+	<update id="update" parameterType="Object">
+		update fcz_owner set
+		<include refid="Update_Column_List" />
+		where storeId=#{storeId}
+	</update>
+
+	<delete id="delete" parameterType="Object">
+		delete from fcz_owner where 1=1
+		<include refid="Where_Clause" />
+	</delete>
+
+	<select id="list" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from fcz_owner
+		where 1=1
+		<include refid="Where_Clause" />
+		order by totalPoint desc limit 0,15
+	</select>
+
+
+	<select id="get" parameterType="Object" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from fcz_owner
+		where 1=1
+		<include refid="Where_Clause" />
+	</select>
+	
+	<select id="countAll" resultType="Integer">
+	    select count(*) as num from fcz_owner;
+	</select> 
+	
+	<select id="countByCondition" parameterType="Map" resultType="Integer">
+	    select count(*) as num from fcz_owner where totalPoint &lt; #{totalPoint}
+	</select>
+
+</mapper>   

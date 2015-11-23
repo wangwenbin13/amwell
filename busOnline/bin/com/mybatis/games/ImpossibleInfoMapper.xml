@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mapper.games.ImpossibleInfoMapper">
+	<!-- Result Map-->
+	<resultMap id="BaseResultMap" type="com.bean.games.ImpossibleInfo">
+		<result column="beginTime" property="beginTime" />
+		<result column="endTime" property="endTime" />
+		<result column="prize1" property="prize1" />
+		<result column="prize2" property="prize2" />
+		<result column="prize3" property="prize3" />
+		<result column="prize4" property="prize4" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		beginTime,endTime,prize1,prize2,prize3,prize4
+	</sql>
+
+	<select id="get" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from ImpossibleInfo
+	</select>
+</mapper>   

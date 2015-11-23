@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mapper.games.ImpossibleMapper">
+	<!-- Result Map-->
+	<resultMap id="BaseResultMap" type="com.bean.games.Impossible">
+		<result column="uid" property="uid" />
+		<result column="tel" property="tel" />
+		<result column="prize" property="prize" />
+		<result column="createTime" property="createTime" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		uid,tel,prize,createTime
+	</sql>
+
+	<!-- 插入记录 -->
+	<insert id="add" parameterType="Object">
+		insert into Impossible(
+		<include refid="Base_Column_List" />
+		) values(#{uid},#{tel},#{prize},#{createTime})
+	</insert>
+	
+	<select id="getByTel" parameterType="String" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from Impossible where tel=#{tel}
+	</select>
+	
+	<select id="getByIdAndTime" parameterType="map" resultMap="BaseResultMap">
+		select
+		<include refid="Base_Column_List" />
+		from Impossible where uid=#{id} and createTime > #{time}
+	</select>
+</mapper>   
