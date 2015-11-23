@@ -1,0 +1,392 @@
+package com.pig84.ab.service.impl;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.pig84.ab.dao.IBookDao;
+import com.pig84.ab.dao.ILeaseDao;
+import com.pig84.ab.dao.ILineDao;
+import com.pig84.ab.dao.IStationInfoDao;
+import com.pig84.ab.dao.ITaskForMsgDao;
+import com.pig84.ab.dao.impl.RePeat;
+import com.pig84.ab.service.IBookService;
+import com.pig84.ab.utils.MyDate;
+import com.pig84.ab.vo.ApplyReturn;
+import com.pig84.ab.vo.LeaseBaseInfo;
+import com.pig84.ab.vo.PassengerComments;
+import com.pig84.ab.vo.StationInfo;
+import com.pig84.ab.vo.bean.AppVo_10;
+import com.pig84.ab.vo.bean.AppVo_10_list;
+import com.pig84.ab.vo.bean.AppVo_15_list;
+import com.pig84.ab.vo.bean.AppVo_18;
+import com.pig84.ab.vo.bean.AppVo_2;
+import com.pig84.ab.vo.bean.AppVo_25;
+import com.pig84.ab.vo.bean.AppVo_4;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_6;
+import com.pig84.ab.vo.bean.AppVo_7;
+/**
+ * 预定相关
+ * @author zhangqiang
+ *
+ */
+@Service("bookService")
+public class BookServiceImpl implements IBookService {
+
+	private static final Logger log = LoggerFactory.getLogger(BookServiceImpl.class);
+
+	@Autowired
+	private IBookDao bookDao;
+	
+	@Autowired
+	private ITaskForMsgDao taskDao;
+	
+	@Autowired
+	private IStationInfoDao stationInfoDao;
+	
+	@Autowired
+	private ILeaseDao leaseDao;
+	
+	@Autowired
+	private ILineDao lineDao;
+	
+	@Autowired
+	private RePeat rePeat;
+	
+	/**
+	 * 订单详细（按次订单）
+	 */
+	public AppVo_15_list orderInfoByDays(String orderNo) {
+		return bookDao.orderInfoByDays(orderNo);
+	}
+
+	
+	/**
+	 * 订单评价
+	 */
+	public String orderCommentsV2(String orderNo,PassengerComments pc) {
+		return bookDao.orderCommentsV2(orderNo,pc);
+	}
+
+	/**
+	 * 取消订单
+	 */
+	public String cancelOrder(String orderNo) {
+		return bookDao.cancelOrder(orderNo);
+	}
+
+	/**电子票详细（按次购买）**/
+	public AppVo_10_list ticketInfoByDays(String orderNo) {
+		return bookDao.ticketInfoByDays(orderNo);
+	}
+
+	/**
+	 * 获取用户余额
+	 */
+	public String getUserBalance(String userId) {
+		return bookDao.getUserBalance(userId);
+	}
+
+	/**
+	 * 获取订单价格
+	 */
+	public String getOrderPrice(String orderNo) {
+		return bookDao.getOrderPrice(orderNo);
+	}
+	
+	/**获取报价信息**/
+	public AppVo_4 getBcBiddingById(String bcBiddingId) {
+		return bookDao.getBcBiddingById(bcBiddingId);
+	}
+
+	/**
+	 * 获取用户未支付订单数
+	 */
+	public String getUnPayOrderCount(String userId) {
+		return bookDao.getUnPayOrderCount(userId);
+	}
+
+	/**
+	 * 获取用户未读消息数
+	 */
+	public String getUnReadMsgCount(String userId) {
+		return bookDao.getUnReadMsgCount(userId);
+	}
+
+	/**根据订单号获取订单对应的发车时间与用户手机号码**/
+	public AppVo_4 getOrderTimeAndUserPhone(String orderNo) {
+		return bookDao.getOrderTimeAndUserPhone(orderNo);
+	}
+	
+	/**根据线路ID获取班次线路详细（NEW）**/
+	public AppVo_15_list LineAndClassInfo(String lineBaseId){
+		return bookDao.LineAndClassInfo(lineBaseId);
+	}
+	
+	/**评论列表**/
+	public List<AppVo_6> commentList(int currentPage,int pageSize,String lineBaseId){
+		return bookDao.commentList(currentPage,pageSize,lineBaseId);
+	}
+
+	/***查看记录是否存在**/
+	public int isExitsInStatTotal(String outTradeNo) {
+		return bookDao.isExitsInStatTotal(outTradeNo);
+	}
+
+	/**添加收入统计**/
+	public int addStatTotal(String orderNo) {
+		return bookDao.addStatTotal(orderNo);
+	}
+	
+	/**可用优惠券列表**/
+	public List<AppVo_10> getMyGif(String orderPrice,String userid, int currentPage,int pageSize,String type){
+		return bookDao.getMyGif(orderPrice,userid, currentPage,pageSize,type);
+	}
+	
+	/**根据订单号检查订单是否有误**/
+	public boolean checkOrder(String orderNo){
+		return bookDao.checkOrder(orderNo);
+	}
+	
+	/**可改签列表**/
+	public List<AppVo_6> changeList(String orderNo,String userid){
+		return bookDao.changeList(orderNo,userid);
+	}
+	
+	/**改签日期列表**/
+	public List<AppVo_6> changeDateList(String orderNo , int currentPage, int pageSize){
+		return bookDao.changeDateList(orderNo,currentPage,pageSize);
+	}
+	
+	/**获取线路相关信息**/
+	public AppVo_6 getLineInfo(String orderNo){
+		return bookDao.getLineInfo(orderNo);
+	}
+
+	/**新版改签(APP前端直接改签,不需要通过平台审批)**/
+	public String changeTicket(String orderNo, String cids) {
+		String value = bookDao.changeTicket(orderNo,cids);
+		String[] code = value.split("@");
+		String status = null;
+		if("1".equals(code[0])){
+			//改签成功,返回的信息eg:  1@1212111121212;545454455;
+			status = "1";
+			String[] msgIds = code[1].split(";");
+			for(int i = 0;i<msgIds.length;i++){
+				if(!StringUtils.isEmpty(msgIds[i])){
+					//改签成功,推送信息
+					taskDao.doTaskById(msgIds[i].trim());
+				}
+			}
+		}else{
+			status = code[0];
+		}
+		log.info("改签{} 结果：{}", StringUtils.join(code, ","), status);
+		return status;
+	}
+
+	/**计算退票的相关数据**/
+	public Integer queryReturnPercent() {
+		return bookDao.queryReturnPercent();
+	}
+
+	/**退票**/
+	public int returnTicket(String localIds, String lineClassIds, String orderNo,AppVo_5 vo_4,String payType,String version) {
+		int statu = 0;
+		if(StringUtils.isEmpty(localIds) || StringUtils.isEmpty(lineClassIds) || StringUtils.isEmpty(orderNo) || StringUtils.isEmpty(vo_4.getA4()) ||
+				StringUtils.isEmpty(vo_4.getA1()) || StringUtils.isEmpty(vo_4.getA2()) || StringUtils.isEmpty(vo_4.getA3()) || StringUtils.isEmpty(vo_4.getA5())){
+			statu = 0;
+		}else{
+			ApplyReturn applyReturn = new ApplyReturn();
+			applyReturn.setLocalIds(localIds);
+			applyReturn.setLineClassIds(lineClassIds);
+			applyReturn.setLeaseOrderNo(orderNo);
+			applyReturn.setOldReturn(vo_4.getA1());
+			applyReturn.setPercent(vo_4.getA2());
+			applyReturn.setRealReturn(vo_4.getA3());
+			applyReturn.setRealPoundage(vo_4.getA5());
+			applyReturn.setPassengerId(vo_4.getA4());
+			applyReturn.setApplyTime(MyDate.Format.DATETIME.now());
+			applyReturn.setPayModel(payType);
+			//支付方式 0：无 1：余额支付，2：财付通 3：银联 4：支付宝 5:微信 6:(APP)微信
+			if(("6".equals(payType) || "7".equals(payType)) && !StringUtils.isEmpty(version) && "1".equals(version)){
+				//新版微信才需要修改状态
+				applyReturn.setType("1");
+			}
+			String returnValue =  bookDao.returnTicket(localIds,lineClassIds,orderNo,vo_4,payType);
+			if(!StringUtils.isEmpty(returnValue)){
+				String[] values = returnValue.split("@");
+				applyReturn.setReturnDates(values[2]);
+				statu = bookDao.applyReturnTicket(applyReturn);
+				statu = Integer.parseInt(values[0]);
+				if(values.length>1){
+					taskDao.doTaskById(values[1].trim());
+				}
+			}
+		}
+		return statu;
+	}
+	
+/*************************************************************************新增接口（V2.0）***********************************************************************/
+	
+	/**班车详情**/
+	public AppVo_15_list getLineAndClassInfo(String lineBaseId,String slineId,String passengerid){
+		return bookDao.getLineAndClassInfo(lineBaseId,slineId,passengerid);
+	}
+
+	/**新版)改签或退票列表**/
+	public AppVo_15_list changeOrReturn(String orderNo, String userid,Integer type) {
+		//根据订单号获取订单信息
+		LeaseBaseInfo baseInfo = leaseDao.queryLeaseBaseInfo(orderNo);
+		if(null==baseInfo || StringUtils.isEmpty(baseInfo.getLineBaseId()) || StringUtils.isEmpty(baseInfo.getSlineId())){
+			return null;
+		}
+		//根据子线路ID获取子线路信息
+//		LineSplitInfo lineSplitInfo = lineDao.querySplieInfo(baseInfo.getSlineId());
+//		if(null==lineSplitInfo || StringUtils.isEmpty(lineSplitInfo.getSid())){
+//			return null;
+//		}
+		
+		//根据线路ID获取线路班次信息
+		AppVo_15_list vo = lineDao.queryLineBaseAndClass(baseInfo.getLineBaseId());
+		
+		if(null==vo || StringUtils.isEmpty(vo.getA1())){
+			return null;
+		}
+		
+		//线路起点ID
+		String startStationId = vo.getA1().split(",")[0];
+		
+		String allStationIds = rePeat.quChong(startStationId+","+baseInfo.getUstation()+","+baseInfo.getDstation());
+		
+		//以站点ID为key,站点名字为value的map
+		Map<String,String> maps = new HashMap<String,String>();
+		
+		//根据站点ID获取站点信息
+		List<StationInfo> stationInfos = stationInfoDao.queryStationById(allStationIds);
+		
+		if(null!=stationInfos && stationInfos.size()>0){
+			for(StationInfo StationInfo : stationInfos){
+				maps.put(StationInfo.getId(), StationInfo.getName());
+			}
+		}
+		
+		String totalPrice = "0";//总价
+		if(type==2){
+			//退票--原来的总票价
+			totalPrice = leaseDao.queryReturnTicketOldMoney(orderNo);
+			if(null==totalPrice){
+				totalPrice = baseInfo.getTotalCount();
+			}
+		}else if(type==1){
+			//改签
+			totalPrice = baseInfo.getTotalCount();
+		}
+		
+		vo.setA1(baseInfo.getLeaseOrderNo());                             //订单号
+		vo.setA5(baseInfo.getLeaseOrderTime());                           //下单时间
+		vo.setA6(baseInfo.getRidesInfo());                                //票数
+		vo.setA7(totalPrice);                                             //总价
+		vo.setA8(baseInfo.getTotalCount());                               //已支付价格
+		vo.setA9(maps.get(baseInfo.getUstation()));                  //上车点
+		vo.setA10(maps.get(baseInfo.getDstation()));                 //下车点
+		vo.setA11(maps.get(startStationId));                              //始发站
+		return vo;
+	}
+	
+	/**可用优惠卷列表(v2.0新接口)**/
+	public List<AppVo_10> getUsableGif(String userid,String type){
+		return bookDao.getUsableGif(userid,type);
+	}
+	
+	/**车票预定（按次购买V2.0新增接口）**/
+	public String bookLineByDays_new(String lineBaseid,String lineSplitId,String lineClassIds,String userid,String userType,String gifId){
+		return bookDao.bookLineByDays_new(lineBaseid,lineSplitId, lineClassIds, userid, userType, gifId);
+	}
+	
+	public AppVo_2 getOrderGifMoney(String orderNo){
+		return bookDao.getOrderGifMoney(orderNo);
+	}
+	
+	/**获取包车订单对应的优惠券金额**/
+	public AppVo_2 getBcOrderGifMoney(String orderNo){
+		return bookDao.getBcOrderGifMoney(orderNo);
+	}
+
+	/**申请退票**/
+	public int applyReturnTicket(ApplyReturn applyReturn) {
+		int statu = bookDao.applyReturnTicket(applyReturn);
+		if(statu>=1){
+			String msgId = bookDao.addMsgInfo(applyReturn);
+			if(StringUtils.isEmpty(msgId)){
+				taskDao.doTaskById(msgId);
+			}
+		}
+		return statu;
+	}
+	
+	/**订单列表v2.1**/
+	public List<AppVo_18> getOrderListByV2_1(String userid,String orderType,String currentPage,String pageSize){
+		return bookDao.getOrderListByV2_1(userid, orderType, currentPage, pageSize);
+	}
+	
+	/**获取订单详细v2.1**/
+	public AppVo_15_list getOrderInfoByV2_1(String orderNo){
+		return bookDao.getOrderInfoByV2_1(orderNo);
+	}
+
+	/**改签详情(2.1)**/
+	public List<AppVo_6> changeTicketDetail_V2_1(String localId) {
+		return bookDao.changeTicketDetail_V2_1(localId);
+	}
+
+	/**退票详情(2.1)**/
+	public List<AppVo_7> returnTicketDetail_V2_1(String localId) {
+		return bookDao.returnTicketDetail_V2_1(localId);
+	}
+
+	/**获取订单的支付方式**/
+	public String queryLeasePayType(String orderNo) {
+		return leaseDao.queryLeasePayType(orderNo);
+	}
+
+	/**检查该退款记录是否存在**/
+	public boolean checkReturnCount(String localIds, String lineClassIds,
+			String orderNo, String passengerId, String realBack) {
+		return leaseDao.checkReturnCount(localIds,lineClassIds,orderNo,passengerId,realBack);
+	}
+
+	/**添加退款记录信息**/
+	public void addReturnMoneyCount(String localIds, String lineClassIds,
+			String orderNo, String passengerId, String realBack) {
+		leaseDao.addReturnMoneyCount(localIds,lineClassIds,orderNo,passengerId,realBack);
+	}
+
+	@Override
+	public LeaseBaseInfo getLeaseInfoByOrderId(String orderId) {
+		// TODO Auto-generated method stub
+		return leaseDao.queryLeaseBaseInfo(orderId);
+	}
+
+	/**检查是否已经申请过退票---如果申请了,则不再重复申请**/
+	public int qeryReturnTicket(String lineClassIds, String orderNo, String passengerId) {
+		return leaseDao.qeryReturnTicket(lineClassIds,orderNo,passengerId);
+	}
+	
+	/** 电子票列表v2.3**/
+	public List<AppVo_25> getTicktListByV2_3(String userId,String type,String currentPage,String pageSize){
+		return bookDao.getTicktListByV2_3(userId,type,currentPage,pageSize);
+	}
+
+	/**查找原实际金额**/
+	public String queryPriceByLocalIds(String localIds) {
+		return bookDao.queryPriceByLocalIds(localIds);
+	}
+}

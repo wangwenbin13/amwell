@@ -1,0 +1,23 @@
+package com.pig84.ab.vo.coupon;
+
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * 用户来源规则
+ * @author gxt
+ *
+ */
+public class SourceFromRule extends Rule {
+
+	public SourceFromRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public PassengerInfo filter(Object obj,PassengerInfo passenger){
+		if(getTheValue().equals(passenger.getSourcefrom())){//规则中的用户来源与用户来源相匹配
+			return passenger;
+		}
+		return null;
+	}
+}

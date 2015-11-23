@@ -1,0 +1,16 @@
+
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP TRIGGER /*!50032 IF EXISTS */ `t_afterupdate_on_line_base_info`$$
+
+CREATE
+    /*!50017 DEFINER = 'root'@'%' */
+    TRIGGER `t_afterupdate_on_line_base_info` AFTER UPDATE ON `line_base_info` 
+    FOR EACH ROW BEGIN
+	CALL p_line_changeinfo(old.lineBaseId);
+END;
+$$
+
+DELIMITER ;

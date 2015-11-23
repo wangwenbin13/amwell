@@ -1,0 +1,242 @@
+<%@ page language="java" import="java.util.*" pageEncoding="UTF-8"%>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<%@ taglib prefix="s" uri="/struts-tags"%>
+<!-- 乘客列表Div start -->
+<div class="mb15 hide" id="listDiv">
+	<div class="fl dj-box p-r"
+		style="margin-left: 80px;width:540px;background:#fff;"
+		id="marketingPassengerList">
+		<span style="left:93px;top:-10px" class="sb-arrow p-a"></span>
+		<ul class="clearfix">
+			<li class="mt10 clearfix">
+				<span class="fl w65 t-r">线路：</span>
+				<span class="fl w75p p-r">
+		            <span class="p-a arrow arrow-desc" style="top:10px;right:34%;"></span>
+		            <input type="text" name="search.field09" id="lineBase" class="r-input w67p fl mr10"/>
+		            <input type="hidden" name="lineBaseId" id="lineBaseId"/>
+		        </span> 
+			</li>
+			<li class="mt10"><span class="fl w65 t-r">乘坐日期：</span> <span
+				class="r-input fl w29p mr20"><input type="text"
+					name="search.field10" value="" class="Wdate75 gray2 Wdate"
+					readonly="readonly" id="startDate"
+					onclick="WdatePicker({position:{left:-9,top:4},dateFmt:'yyyy-MM-dd'})" />
+			</span></li>
+			<li class="mt10"><span class="fl w65 t-r">班次：</span> <select
+				class="w22p p3" name="search.field11" id="classTime">
+					<option value="">请选择班次</option>
+			</select>
+			</li>
+			<li class="widthfull mt10 p-r"><span class="fl">手机号码：</span> <span
+				class="fl w25p mr10"> <input type="text"
+					class="fl r-input w98p mr10" id="telephone" /> </span> <a
+				class="search-btn1 fl mt2 ml5" href="javascript:void(0)"
+				onclick="toPage(0)"></a>
+			</li>
+		</ul>
+		<!-- 乘客列表-->
+		<div id="target">
+			<p class="bt-bot-line f14 blue2 mt10">
+				<span class="bt-ico fl mr5"></span>乘客列表
+			</p>
+			<div class="table2-text sh-ttext"
+				style="max-height:200px;overflow-y:auto;">
+				<table width="100%" border="0" class="table1 t-line30"
+					id="passengerList">
+					<tr>
+						<th scope="col" width="6%"><input type="checkbox"
+							name="checkAllBox" class="checkbox" id="checkAllBox" /></th>
+						<th scope="col">乘客昵称</th>
+						<th scope="col" width="10%">性别</th>
+						<th scope="col" width="35%">手机号码</th>
+					</tr>
+				</table>
+			</div>
+		</div>
+	</div>
+	<div id="phoneList">
+		<span class="w95 t-r fl">手机号码列表：<em class="red1  mr4">*</em></br>(号码空格分开)</span>
+	</div>
+<!-- 搜索内容 -->
+<div class="hide">
+   <select id="searchData" name="searchData">
+   		<option id="001" value="abc">abc</option>
+   		<option id="002" value="bbb">bbb</option>
+   		<option id="003" value="ccc">ccc</option>
+   		<option id="004" value="ddd">ddd</option>
+  </select>
+</div>
+
+</div>
+<script src="../js/select/liquidmetal.js" type="text/javascript"></script>
+<script src="../js/select/jquery.flexselect.js" type="text/javascript"></script><!-- 下拉框的js -->
+<!-- 乘客列表Div end -->
+<script type="text/javascript">
+function toPage(value){
+
+	$("#checkAllBox").attr("checked",false);
+	$("#passengerList tr:gt(0)").remove();
+	
+
+		$("#telephoneShow").show();
+		var lineBase=$("#lineBase").val();
+		var startDate=$("#startDate").val();
+		var classTime=$("#classTime").val();
+	    var telephone = $("#telephone").val();
+	    var url = "../marketing/passengerList.action?telephone="+telephone+"&lineBase="+encodeURI(encodeURI(lineBase))+"&startDate="+startDate+"&classTime="+classTime;
+		 $.ajax({
+			url:url,
+			cache:false,
+			type : 'post',
+			dataType:"json",
+			success:function(data){	
+
+				if(data!=null){
+					for(var i=0;i<data.length;i++){
+						var phone=data[i].telephone;
+						var nickName=data[i].nickName;
+						var sex=data[i].sex;
+						if(sex==0){
+							var sexs="男";
+						}else{
+							var sexs="女";
+						}
+						$("#passengerList").append("<tr class='bg1' align='center' id="+phone+"><td><input type='checkbox' name='checkboxchild' value='"+phone+"'  class='checkbox' id='child"+i+"'/></td><td>"+nickName+"</td><td class='f-arial'>"+sexs+"</td><td class='f-arial'>"+phone+"</td></tr>");
+					}
+							
+					//选中某一项
+					$('input[name="checkboxchild"]').click(function(){
+						var $checkBoxChild = $("input[name='checkboxchild']");
+						$("#checkAllBox").attr("checked",$checkBoxChild.length == $("input[name='checkboxchild']:checked").length ? true : false);
+					});
+				}
+			}
+		}); 
+	
+}
+
+//全部选中
+$("#checkAllBox").click(function(){
+
+	//判断是否已经打勾
+	$('input[name="checkboxchild"]').attr("checked",this.checked);
+});
+
+function changePage(index)
+{
+	//全部选择
+	if(index == 0)
+	{
+
+		$("#listDiv").hide();
+		$("#leadDiv").hide();
+
+	}
+	//选择发送
+	else if(index == 1)
+	{
+	
+		$("#listDiv").show();
+		$("#leadDiv").hide();
+		var url="../marketing/getClassList.action";
+		$.ajax({
+			url:url,
+			cache:false,
+			type : 'post',
+			dataType:"json",
+			success:function(data){
+				for(var i=0;i<data.length;i++){
+					$("#classTime").append("<option value='"+data[i].orderStartTime+"'>"+data[i].orderStartTime+"</option>");
+				}
+			}
+		});
+
+	}
+	//批量导入号码
+	else if(index == 2||index == 3)
+	{
+		$("#listDiv").hide();
+		$("#leadDiv").show();
+	}	
+}
+
+//获取选中的所有id
+function getCheckLoginIds()
+{
+	var checkboxs = $("input[name='checkboxchild']");
+	var loginIds = "";
+	
+	for (var i = 0; i < checkboxs.length; i++)
+	{
+		if (checkboxs[i].type == "checkbox" && checkboxs[i].id != "checkAllBox")
+		{
+			if (checkboxs[i].checked)
+			{
+				loginIds = loginIds + checkboxs[i].value + ";";
+			}
+		}
+	}
+	
+	if ("" != loginIds)
+	{
+		loginIds = loginIds.substring(0, loginIds.length - 1);
+	}
+	
+	return loginIds;
+}
+//下拉搜索框----------------------------------------------------------------------------
+$.fn.example = function(select, type) {
+    var div = $("<div></div>").addClass(type).append(select.clone().attr({ id: select.attr("id") + "_" + type, "class": type }));
+    //this.append(div);  //如果是div，则是append
+    this.after(div);  //如果是input，则是after
+};	
+//创建下拉搜索
+function createSelectSearch()
+{	
+	//搜索内容
+    var searchData = $("#searchData");
+       
+	//创建搜索下拉框,将搜索内容追加进去
+    $("#lineBase").example(searchData, "flexselect");
+
+	$("select.flexselect").flexselect();
+
+	//搜索下拉框默认值为空
+    var searchByRoleName = $("#searchData_flexselect_flexselect");
+	searchByRoleName.attr("value","");
+	searchByRoleName.hide();
+	
+    $("select").attr("tabindex", -1);
+    $("input.flexselect").each(function(index) { $(this).attr("tabindex", index+1) });
+ 		 
+	 $("#lineBase").focus(function(){
+	 	  $("#lineBase").blur();
+	      searchByRoleName.show();
+	      //让输入搜索框落焦点
+	      searchByRoleName.focus();
+  	 });
+}
+
+//查询线路名称列表
+function loadLineList(){
+  var url = "../line/getAllLinesJson.action";
+  	$.ajax({
+		url:url,		
+		cache:false,	
+		dataType:"json",
+		async : false,
+		success:function(data){
+		    $("#searchData").children().remove();
+		    if(data!=null&&data.length>0){
+		       for(var i=0;i<data.length;i++){
+		         $("#searchData").append("<option id="+data[i].lineBaseId+" value="+data[i].lineBaseId+">"+data[i].lineName+"</option>");
+		       }
+		    }
+		}
+	});
+}
+$(document).ready(function() {
+   loadLineList();
+   createSelectSearch(); 
+});	
+</script>

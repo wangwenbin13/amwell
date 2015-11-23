@@ -1,0 +1,279 @@
+package com.amwell.service;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+
+import com.amwell.entity.LeaseOrderModelVo;
+import com.amwell.entity.ReturnTicketVo;
+import com.amwell.entity.Search;
+import com.amwell.vo.ApplyReturn;
+import com.amwell.vo.Errlog;
+import com.amwell.vo.ReturnTicket;
+import com.amwell.vo.StatOutEntity;
+import com.amwell.vo.StatOutLeaCou;
+import com.amwell.vo.StatTotalEntity;
+
+public interface ILeaseOrderService {
+
+	/**
+	 * 查找所有订单列表
+	 * @param search
+	 * @param pageSizeIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String,Object> listByPage(Search search,int pageSizeIndex,int pageSize);
+
+	/**
+	 * 充值明细
+	 * @param search
+	 * @param currentPageIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String, Object> rechargeVoList(Search search,
+			Integer currentPageIndex, Integer pageSize);
+
+	/**
+	 * 添加收入统计数据
+	 * @param statTotalEntity
+	 * @return
+	 */
+	public int saveStatTotal(StatTotalEntity statTotalEntity);
+
+	/**
+	 * 日收入统计
+	 * @param search
+	 * @param currentPageIndex
+	 * @param pageSize
+	 * @param totalMoney
+	 * @return
+	 */
+	public Map<String, Object> queryDayStatTotalList(Search search,
+			Integer currentPageIndex, Integer pageSize,BigDecimal totalMoney);
+
+	/**
+	 * 日期月度账目统计
+	 * @param search
+	 * @param dateCurrentPageIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String, Object> queryDateStatTotalList(Search search,
+			Integer dateCurrentPageIndex, Integer pageSize);
+
+	/**
+	 * 按商家月度账目统计报表
+	 * @param search
+	 * @param businessCurrentPageIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String, Object> queryBusinessStatTotalList(Search search,
+			Integer businessCurrentPageIndex, Integer pageSize);
+
+	/**
+	 * 按线路月度账目统计报表
+	 * @param search
+	 * @param lineCurrentPageIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String, Object> queryLineStatTotalList(Search search,
+			Integer lineCurrentPageIndex, Integer pageSize);
+	
+	/**
+	 * 记录错误信息
+	 * @param err
+	 */
+	public void addErrLog(Errlog err);
+
+	/**
+	 * 获取订单详情
+	 * @param leaseOrderModelVo
+	 * @return
+	 */
+	public LeaseOrderModelVo getLeaseOrderById(
+			LeaseOrderModelVo leaseOrderModelVo);
+
+	/**
+	 * 获取车票退票列表
+	 * @param search
+	 * @param currentPageIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String, Object> returnTicketListByPage(Search search,
+			Integer currentPageIndex, Integer pageSize);
+
+	/**
+	 * 车票退票详情
+	 * @param returnTicketVo
+	 * @return
+	 */
+	public ReturnTicketVo getReturnTicket(ReturnTicketVo returnTicketVo);
+
+	/**
+	 * 更改lease_base_info表
+	 * @param leaseOrderId
+	 * @param dateSize
+	 * @param returnTicket
+	 */
+	public void updateLeaseBaseInfo(String leaseOrderId, String dateSize,
+			ReturnTicket returnTicket);
+
+	/**
+	 * 更改lease_pay表
+	 * @param returnTicket
+	 */
+	public void updateLeasePay(ReturnTicket returnTicket);
+
+	/**
+	 * 更改line_business_order表
+	 * @param dateSize
+	 * @param returnTicket
+	 * @param localIds
+	 */
+	public void updateLineBusinessOrder(String dateSize,
+			ReturnTicket returnTicket,String localIds);
+
+	/**
+	 * 更改stat_passenger_recharge表
+	 * @param returnTicket
+	 */
+	public void updateStatPassengerRecharge(ReturnTicket returnTicket);
+
+	/**
+	 * 更改stat_passenger_consum_lease表
+	 * @param returnTicket
+	 */
+	public void updateStatPassengerConsumLease(ReturnTicket returnTicket);
+
+	/**
+	 * 添加退票记录
+	 * @param returnTicket
+	 */
+	public int addReturnTicket(ReturnTicket returnTicket,String userId,String leaseOrderId,String lineClassIds);
+
+	/**
+	 * 已退票列表
+	 * @param search
+	 * @param currentPageIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String, Object> hasReturnTicketListByPage(Search search,
+			Integer currentPageIndex, Integer pageSize);
+
+	/**
+	 * 车票退票详情
+	 * @param returnTicket
+	 * @return
+	 */
+	public ReturnTicket getReturnTicketDetail(ReturnTicket returnTicket);
+
+	/**
+	 * 支出列表
+	 * @param search
+	 * @param currentPageIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String, Object> getStatOutListByPage(Search search,
+			Integer currentPageIndex, Integer pageSize);
+	
+	/**
+	 * 添加收入统计记录
+	 * @param leaseOrderNo
+	 * @return
+	 */
+	public int addStatTotal(String leaseOrderNo);
+
+	/**
+	 * 取得所有已支付的订单号
+	 * @return
+	 */
+	public List<String> getLeaseOrderNo(Integer currentPageIndex,Integer pageSize);
+
+	/**
+	 * 检查支付方式
+	 * 包含余额支付的都不允许退票
+	 * @param leaseOrderId
+	 * @return
+	 */
+	public int getLeasePayCount(String leaseOrderId);
+
+	/**
+	 * 判断该订单是否已经添加过收入记录
+	 * 如果已经存在了，则不再添加
+	 * @param leaseOrderNo
+	 * @return
+	 */
+	public int getStatTotalCountByLeaseOrderNo(String leaseOrderNo);
+
+	/**
+	 * 从支出表里面还原数据到收入表
+	 * @param list
+	 */
+	public void addStatTotalByStatOut(List<StatOutEntity> list);
+
+	/**
+	 * 清空收入统计表(小猪巴士)
+	 */
+	public int truncateTable();
+
+	/**找出退票的订单 以及该订单退票的张数(张数大于1张)**/
+	public List<StatOutLeaCou> queryStatOutLeaCou(Integer page,Integer pageSize);
+
+	/**比较该订单号支出的价格是否等于该订单号对应的退票记录中的退票金额，如果是，则需要修改**/
+	public boolean compareLeaMon(StatOutLeaCou leaCou);
+
+	/***更改对应的支出记录**/
+	public int updateStatOut(StatOutLeaCou leaCou);
+
+	/**找出总共需要修改的退票订单记录数**/
+	public int queryStatOutLeaCouAllCount();
+
+	/**找出总共需要恢复的订单记录数**/
+	public int queryLeaseOrderCount();
+
+	/**找出总共需要恢复的支出记录数**/
+	public int queryStatOutListCount();
+
+	/**事务处理恢复订单**/
+	public boolean recordBack();
+
+	/**上下班优惠券列表**/
+	public Map<String, Object> queryBusCouponStatList(Search search,
+			Integer currentPageIndex, Integer pageSize);
+
+	/**乘客申请退票列表**/
+	public Map<String, Object> applyReturnTicketList(Search search,
+			Integer currentPageIndex, Integer pageSize);
+
+	/**修改退票申请状态**/
+	public int updateApplyReturnTicketType(ApplyReturn applyReturn);
+
+	/**计算总计**/
+	public String countTotalValue(Search search);
+
+	/**(APP)支付宝退票列表**/
+	public Map<String, Object> appZfbReturnTicketList(Search search,
+			Integer currentPageIndex, Integer pageSize);
+
+	/**将该次需要退款的数据加上批次号**/
+	public int addBatchNoToReturnTicket(String returnIds, String batchNo);
+
+	/**根据退款批次号修改return_ticket的退款状态**/
+	public int updateReturnOrNot(String batchNo);
+
+	/**添加退款记录**/
+	public void addReturnStatu(int statu, int type, String batchNo);
+
+	/**根据条件获取总记录数**/
+	public int queryTotal(Search search);
+
+	/**根据条件获得对应的订单记录数**/
+	public int queryLeaseNuByCon(Search search);
+}

@@ -1,0 +1,663 @@
+package com.amwell.dao.impl;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.handlers.BeanHandler;
+import org.apache.commons.dbutils.handlers.BeanListHandler;
+import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+
+import com.amwell.base.DaoSupport;
+import com.amwell.commons.MyDataSource;
+import com.amwell.commons.MyDate;
+import com.amwell.commons.SqlBuilder;
+import com.amwell.commons.StringUtil;
+import com.amwell.commons.SystemConstants;
+import com.amwell.dao.IChangeTicketDAO;
+import com.amwell.entity.Page;
+import com.amwell.entity.Search;
+import com.amwell.vo.LineClassEntity;
+import com.amwell.vo.LineClassOrderVo;
+import com.amwell.vo.LineEntity;
+import com.amwell.vo.PassengerChangeOrderVo;
+import com.amwell.vo.PassengerInfoEntity;
+import com.amwell.vo.PassengerOrderStatusVo;
+import com.amwell.vo.PassengerOrderVo;
+import com.amwell.vo.StatOutEntity;
+import com.amwell.vo.StatTotalEntity;
+import com.amwell.vo.app.bean.AppVo_1;
+import com.amwell.vo.ticket.ParamVo;
+import com.amwell.vo.ticket.UserApplicationChangeVo;
+
+
+@Repository(value="changeTicketDAO")
+public class ChangeTicketDAOImpl extends DaoSupport implements IChangeTicketDAO {
+
+	public Map<String, Object> getTicketList(Search search,int currentPageIndex, int pageSize) {
+		super.finit("line_business_order a, line_class_info b, passenger_info p, lease_base_info l, line_base_info i");
+//		StringBuffer sql = new StringBuffer("SELECT i.lineBaseId, i.lineName, a.leaseOrderId, l.buyType, l.ispay,b.lineClassId, b.orderStartTime, b.orderDate, b.orderSeats, p.passengerId, p.displayId, p.nickName, p.telephone,l.realprice FROM line_business_order a, line_class_info b, passenger_info p, lease_base_info l, line_base_info i WHERE 1 = 1 AND b.lineBaseId = i.lineBaseId AND l.lineBaseId = i.lineBaseId AND a.leaseOrderId = l.leaseOrderNo AND a.lineClassId = b.lineClassId AND a.passengerId = p.passengerId");
+		StringBuffer sql = new StringBuffer("SELECT i.lineBaseId,i.lineName,a.leaseOrderId,l.buyType,l.ispay,b.lineClassId,b.orderStartTime,b.orderDate,b.orderSeats,p.passengerId,p.displayId,p.nickName,p.telephone,l.realprice ");
+	    sql.append(" FROM line_business_order a LEFT JOIN line_class_info b ON a.lineClassId = b.lineClassId LEFT JOIN passenger_info p ON a.passengerId = p.passengerId LEFT JOIN lease_base_info l ON a.leaseOrderId = l.leaseOrderNo LEFT JOIN line_base_info i ON l.lineBaseId = i.lineBaseId ");
+		sql.append(" WHERE 1 = 1 AND b.lineBaseId = i.lineBaseId AND l.ispay = 1 AND a.status IN (0,1,2) ");
+	    List<Object> paramList = new ArrayList<Object>();
+		if(null!=search){
+			if(StringUtils.hasText(search.getField01())){
+				//乘客手机
+				String type = "";
+				if(search.getField01().trim().length()==11){
+					type = " = ? ";
+					paramList.add(search.getField01().trim());
+				}else{
+					type = " like ? ";
+					paramList.add(SqlBuilder.getSqlLikeValue(search.getField01().trim()));
+				}
+				sql.append(" AND p.telephone  "+type+"");
+			}
+			if(StringUtils.hasText(search.getField02())){
+				//欲改签日期
+				sql.append(" AND b.orderDate>=?");
+				paramList.add(search.getField02());
+			}else{
+				sql.append(" AND b.orderDate>=?");
+				Calendar ca = Calendar.getInstance();
+				SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+				paramList.add(sdf.format(ca.getTime()));
+			}
+			if(StringUtils.hasText(search.getField03())){
+				sql.append(" AND b.orderDate<=?");
+				paramList.add(search.getField03());
+			}
+			if(StringUtils.hasText(search.getField04())){
+				//订单号
+				sql.append(" AND a.leaseOrderId like ?");
+				paramList.add(SqlBuilder.getSqlLikeValue(search.getField04().trim()));
+			}
+			if(StringUtils.hasText(search.getField05())){
+				//班次发车时间
+				sql.append(" AND b.orderStartTime=?");
+				paramList.add(search.getField05().trim());
+			}
+			if(StringUtils.hasText(search.getField06())){
+				//线路名称
+				sql.append(" AND i.lineName like ?");
+				paramList.add(SqlBuilder.getSqlLikeValue(search.getField06().trim()));
+			}
+		}
+		sql.append(" order by b.orderDate asc,b.orderStartTime asc");
+		Object[] params = paramList.toArray(new Object[]{});
+		List<PassengerOrderVo> list = super.tableDao.queryByPage(PassengerOrderVo.class, sql.toString(), currentPageIndex,pageSize, params);
+		Map<String, Object> res = new HashMap<String,Object>();
+		Page page = new Page(list,sql.toString(),currentPageIndex,pageSize,params);
+		res.put("page", page);
+		res.put("list",list);
+		return res;
+	}
+
+	public Map<String, Object> changedTicketList(Search search,int currentPageIndex, int pageSize) {
+		super.finit("passenger_change_order");
+		String name= null;
+		String table = null;
+		if(null==search || "0".equals(search.getField06())){
+			name = " b.loginName ";
+			table = " sys_admin b on a.createBy=b.userId where 1=1 ";
+		}else{
+			name= " b.nickName ";
+			table = " passenger_info b  on a.createBy=b.passengerId where 1=1 ";
+		}
+		StringBuffer sql = new StringBuffer("select a.id,a.orgLineBaseId,a.orgLineName,a.passengerId,a.displayId,a.nickName,a.telephone,a.orgLeaseOrderId,a.orgClassId,a.orgOrderStartTime,a.orgOrderDate,a.newLineBaseId,a.newLineName,a.newLeaseOrderId,a.newClassId,a.newOrderStartTime,a.newOrderDate,"+name+" as createBy,a.createOn from passenger_change_order a left join "+table+" ");
+		List<Object> paramList = new ArrayList<Object>();
+		if(null!=search){
+			if(StringUtils.hasText(search.getField01())){
+				if(StringUtils.hasText(search.getField02())){
+					sql.append(" and a.createOn between ? and ?");
+					paramList.add(search.getField01().trim()+" 00:00:00");
+					paramList.add(search.getField02().trim()+" 23:59:59");
+				}else{
+					sql.append(" and a.createOn>?");
+					paramList.add(search.getField01().trim()+" 00:00:00");
+				}
+			}else{
+				if(StringUtils.hasText(search.getField02())){
+					sql.append(" and a.createOn<?");
+					paramList.add(search.getField02().trim()+" 23:59:59");
+				}
+			}
+			
+			if(StringUtils.hasText(search.getField03())){
+				//订单号
+				sql.append(" and a.newLeaseOrderId like ?");
+				paramList.add(SqlBuilder.getSqlLikeValue(search.getField03().trim()));
+			}
+			if(StringUtils.hasText(search.getField04())){
+				//手机号
+				sql.append(" and a.telephone like ?");
+				paramList.add(SqlBuilder.getSqlLikeValue(search.getField04().trim()));
+			}
+			if(StringUtils.hasText(search.getField05())){
+				//线路名称
+				sql.append(" and a.orgLineName like ?");
+				paramList.add(SqlBuilder.getSqlLikeValue(search.getField05().trim()));
+			}
+			if(StringUtils.hasText(search.getField07())){
+				//乘客ID
+				sql.append(" AND a.passengerId = ? ");
+				paramList.add(search.getField07().trim());
+			}
+		}
+		sql.append(" order by a.createOn desc");
+		Object[] params = paramList.toArray(new Object[]{});
+		List<PassengerChangeOrderVo> list = super.tableDao.queryByPage(PassengerChangeOrderVo.class, sql.toString(), currentPageIndex,pageSize, params);
+		Map<String, Object> res = new HashMap<String,Object>();
+		Page page = new Page(list,sql.toString(),currentPageIndex,pageSize,params);
+		res.put("page", page);
+		res.put("list",list);
+		return res;
+	}
+
+	public List<PassengerOrderStatusVo> getPassengerOrderList(String lineBaseId, String orderStartTime, String passengerId,String beginOrderDate, String endOrderDate) {
+		if(search==null){
+			search = new Search();
+		}
+		if(StringUtils.hasText(lineBaseId)&&StringUtils.hasText(orderStartTime)&&StringUtils.hasText(passengerId)&&StringUtils.hasText(beginOrderDate)){
+			super.finit("line_class_info a");
+			StringBuffer sql = new StringBuffer();
+			Object[] params = null;
+			if(StringUtils.hasText(beginOrderDate)){
+				if(StringUtils.hasText(endOrderDate)){
+				   sql = new StringBuffer("SELECT a.lineClassId, a.orderDate, a.orderSeats - ( SELECT count(busOrder.tickets) FROM line_business_order busOrder, lease_base_info bi WHERE busOrder.leaseOrderId = bi.leaseOrderNo AND ( bi.payStatus = 0 OR bi.ispay = 1 ) AND busOrder.lineClassId = a.lineClassId AND busOrder.status IN (0,1,2) ) AS remainTickets, ( SELECT count(busOrder2.leaseOrderId) FROM line_business_order busOrder2, lease_base_info bi2, passenger_info p WHERE busOrder2.leaseOrderId = bi2.leaseOrderNo AND bi2.payStatus = 1 AND busOrder2.lineClassId = a.lineClassId AND busOrder2.passengerId = p.passengerId and busOrder2.passengerId=? AND busOrder2.status IN (0,1,2)) AS orderCount FROM line_class_info a WHERE a.delFlag=0 and a.lineBaseId = ? AND a.orderStartTime = ? AND a.orderDate BETWEEN ? AND ? order by a.orderDate asc,a.orderStartTime asc");
+				   params =  new Object[]{passengerId,lineBaseId,orderStartTime,beginOrderDate,endOrderDate};
+				}else{
+				   sql = new StringBuffer("SELECT a.lineClassId, a.orderDate, a.orderSeats - ( SELECT count(busOrder.tickets) FROM line_business_order busOrder, lease_base_info bi WHERE busOrder.leaseOrderId = bi.leaseOrderNo AND ( bi.payStatus = 0 OR bi.ispay = 1 ) AND busOrder.lineClassId = a.lineClassId AND busOrder.status IN (0,1,2) ) AS remainTickets, ( SELECT count(busOrder2.leaseOrderId) FROM line_business_order busOrder2, lease_base_info bi2, passenger_info p WHERE busOrder2.leaseOrderId = bi2.leaseOrderNo AND bi2.payStatus = 1 AND busOrder2.lineClassId = a.lineClassId AND busOrder2.passengerId = p.passengerId and busOrder2.passengerId=? AND busOrder2.status IN (0,1,2)) AS orderCount FROM line_class_info a WHERE a.delFlag=0 and a.lineBaseId = ? AND a.orderStartTime = ? AND a.orderDate=? order by a.orderDate asc,a.orderStartTime asc");
+				   params =  new Object[]{passengerId,lineBaseId,orderStartTime,beginOrderDate};
+				}
+			}
+			List<PassengerOrderStatusVo> res = super.tableDao.queryList(PassengerOrderStatusVo.class, sql.toString(), params);
+			if(false==CollectionUtils.isEmpty(res)){
+				List<PassengerOrderStatusVo> newRes = new ArrayList<PassengerOrderStatusVo>(res.size());
+				for(PassengerOrderStatusVo v : res){
+					//-2 已购买；0满座；>0可改签
+					if(v.getRemainTickets()>0&&v.getOrderCount()==0){
+						//如果剩余票数大于0且用户没有预定，则允许改签
+						v.setStatus(v.getRemainTickets());
+					}else{
+						if(v.getRemainTickets()<=0){
+							v.setStatus(0);
+						}
+						if(v.getOrderCount()>0){
+							v.setStatus(-2);
+						}
+					}
+					newRes.add(v);
+				}
+				return newRes;
+			}
+			return res;
+		}
+		throw new IllegalArgumentException();
+	}
+
+	public int changeTicket(String lineBaseId, String leaseOrderId,String passengerId, String orderStartTime, String orderDate,String newLineBaseId, String newOrderStartTime, String newOrderDate,String userId) {
+		List<PassengerOrderStatusVo> vList = this.getPassengerOrderList(newLineBaseId, newOrderStartTime, passengerId, newOrderDate, "");
+		int flag = -1;
+		if(false==CollectionUtils.isEmpty(vList)){
+			PassengerOrderStatusVo p = vList.get(0);
+			if(p.getStatus()>0){
+				//正常
+				Connection conn = null;
+				try {
+					conn = MyDataSource.getConnect();
+					if(null!=conn){
+						conn.setAutoCommit(false);
+						QueryRunner qr = new QueryRunner();
+						//查询原始订单
+						String sql = "select a.localId,b.leaseOrderId,b.leaseOrderNo,a.lineClassId from line_business_order a,lease_base_info b,line_class_info c where a.lineClassId=c.lineClassId and a.leaseOrderId=b.leaseOrderNo and b.ispay=1 and c.lineBaseId=? and c.orderStartTime=? and c.orderDate=? and a.leaseOrderId=? and a.passengerId=?";
+						List<LineClassOrderVo> orgOrderList = qr.query(conn, sql, new BeanListHandler<LineClassOrderVo>(LineClassOrderVo.class), new Object[]{lineBaseId,orderStartTime,orderDate,leaseOrderId,passengerId});
+						if(false==CollectionUtils.isEmpty(orgOrderList)){
+							LineClassOrderVo order = orgOrderList.get(0);
+							if(order!=null){
+								//查询新班次,新班次必须可用
+								sql = "select a.lineClassId,a.driverId,a.vehicleId from line_class_info a where a.delFlag=0 and a.lineBaseId=? and a.orderStartTime=? and a.orderDate=?";
+								List<LineClassEntity> classList = qr.query(conn, sql, new BeanListHandler<LineClassEntity>(LineClassEntity.class), new Object[]{newLineBaseId,newOrderStartTime,newOrderDate});
+								if(false==CollectionUtils.isEmpty(classList)){
+									String newLineClassId = classList.get(0).getLineClassId();
+									String newDriverId=classList.get(0).getDriverId();
+									String newVehicleId=classList.get(0).getVehicleId();
+								    //修改订单
+									sql ="update line_business_order set lineClassId=? where localId=?";
+									flag = qr.update(conn, sql, new Object[]{newLineClassId,order.getLocalId()});
+									if(flag>0){
+										//查询线路名称
+										sql ="select lineName,orderPrice,lineSubType,businessId from line_base_info where lineBaseId=?";
+										List<LineEntity> lineList = qr.query(conn, sql, new BeanListHandler<LineEntity>(LineEntity.class), new Object[]{lineBaseId});
+										String orgLineName = null;
+										String newLineName = null;
+										int lineSubType=0;
+										String businessId = null;
+										if(false==CollectionUtils.isEmpty(lineList)){
+											orgLineName = lineList.get(0).getLineName();
+											lineSubType=lineList.get(0).getLineSubType();
+											businessId = lineList.get(0).getBusinessId();
+										}
+										if(newLineBaseId.equals(lineBaseId)){
+											newLineName=orgLineName;
+										}else{
+											lineList = qr.query(conn, sql, new BeanListHandler<LineEntity>(LineEntity.class), new Object[]{newLineBaseId});
+											if(false==CollectionUtils.isEmpty(lineList)){
+												newLineName = lineList.get(0).getLineName();
+											}
+										}
+										//查询乘客信息
+										sql = "select p.passengerId,p.displayId,p.nickName,p.telephone from passenger_info p  where p.passengerId=?";
+										List<PassengerInfoEntity> pList = qr.query(conn, sql, new BeanListHandler<PassengerInfoEntity>(PassengerInfoEntity.class), new Object[]{passengerId});
+										String displayId = null;
+										String nickName = null;
+										String telephone = null;
+										if(false==CollectionUtils.isEmpty(pList)){
+											PassengerInfoEntity passenger = pList.get(0);
+											displayId = passenger.getDisplayId();
+											nickName=passenger.getNickName();
+											telephone = passenger.getTelephone();
+										}
+										//插入改签记录
+										sql ="INSERT INTO passenger_change_order(id,orgLineBaseId,orgLineName,passengerId,displayId,nickName,telephone,orgLeaseOrderId,orgClassId,orgOrderStartTime,orgOrderDate,newLineBaseId,newLineName,newLeaseOrderId,newClassId,newOrderStartTime,newOrderDate,createBy,createOn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+										flag = qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),lineBaseId,orgLineName,passengerId,displayId,nickName,telephone,leaseOrderId,order.getLineClassId(),orderStartTime,orderDate,newLineBaseId,newLineName,leaseOrderId,newLineClassId,newOrderStartTime,newOrderDate,userId,MyDate.getMyDateLong()});
+										if(flag>0){
+											//查询老班次,老班次必须状态正常
+											sql = "select a.lineClassId,a.driverId,a.vehicleId from line_class_info a where a.delFlag=0 and a.lineBaseId=? and a.orderStartTime=? and a.orderDate=?";
+											List<LineClassEntity> orgClassList = qr.query(conn, sql, new BeanListHandler<LineClassEntity>(LineClassEntity.class), new Object[]{lineBaseId,orderStartTime,orderDate});
+											String orgClassId = null;
+											String driverId=null;
+											String vehicleId=null;
+											if(false==CollectionUtils.isEmpty(orgClassList)){
+												orgClassId = orgClassList.get(0).getLineClassId();
+												driverId = orgClassList.get(0).getDriverId();
+												vehicleId=orgClassList.get(0).getVehicleId();
+												if(StringUtils.hasText(orgClassId)){
+													sql ="delete from stat_passenger_consum_detail where leaseOrderId=? and lineClassId=?";
+													qr.update(conn, sql, new Object[]{order.getLeaseOrderId(),orgClassId});
+												}
+											}
+										    //查询原始收入统计
+										    sql="select a.consumeLimit,a.discountRate,a.leaseOrderNo,a.businessId,a.linePrice from stat_total a where a.passengerId=? and a.lineBaseId=? and a.orderDate=? and a.orderStartTime=? and a.lineClassId=? and a.leaseOrderNo=?";
+										    List<StatTotalEntity> statTotalList = qr.query(conn, sql, new BeanListHandler<StatTotalEntity>(StatTotalEntity.class), new Object[]{passengerId,lineBaseId,orderDate,orderStartTime,orgClassId,order.getLeaseOrderNo()});
+										    if(false==CollectionUtils.isEmpty(statTotalList)){
+										    	StatTotalEntity statTotal = statTotalList.get(0);
+										    	if(null!=statTotal){
+										    		//添加支出记录
+													StatOutEntity outEntity = new StatOutEntity();
+													outEntity.setStatOutId(StringUtil.generateSequenceNo());
+													outEntity.setLeaseOrderNo(order.getLeaseOrderNo());
+													outEntity.setOperatTime(MyDate.getMyDateLong());
+													outEntity.setOperater(userId);
+													//取收入统计的消费金额
+													outEntity.setOutMoney(statTotal.getConsumeLimit());
+													//支出类型 1:退票   2:改签
+													outEntity.setOutType(2);
+													outEntity.setOrderDate(orderDate);
+													outEntity.setOrderStartTime(orderStartTime);
+													outEntity.setPassengerId(passengerId);
+													outEntity.setLineBaseId(lineBaseId);
+													outEntity.setLineSubType(lineSubType);
+													outEntity.setDriverId(driverId);
+													outEntity.setBusinessId(businessId);
+													outEntity.setVehicleId(vehicleId);
+													outEntity.setLineClassId(orgClassId);
+													sql = "insert into stat_out(statOutId,orderDate,orderStartTime,lineSubType,lineBaseId,passengerId,driverId,outMoney,businessId,vehicleId,operatTime,operater,leaseOrderNo,lineClassId,outType) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+												    qr.update(conn, sql,new Object[]{outEntity.getStatOutId(),outEntity.getOrderDate(),outEntity.getOrderStartTime(),outEntity.getLineSubType(),outEntity.getLineBaseId(),outEntity.getPassengerId(),outEntity.getDriverId(),outEntity.getOutMoney(),outEntity.getBusinessId(),outEntity.getVehicleId(),outEntity.getOperatTime(),outEntity.getOperater(),outEntity.getLeaseOrderNo(),outEntity.getLineClassId(),outEntity.getOutType()});
+										    		sql="INSERT INTO stat_total(statTotalId,orderDate,orderStartTime,lineSubType,lineBaseId,passengerId,driverId,consumeLimit,discountRate,buyType,vehicleId,leaseOrderNo,lineClassId,businessId,linePrice,operatTime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)";
+													qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),newOrderDate,newOrderStartTime,lineSubType,newLineBaseId,passengerId,newDriverId,statTotal.getConsumeLimit(),statTotal.getDiscountRate(),2,newVehicleId,statTotal.getLeaseOrderNo(),newLineClassId,statTotal.getBusinessId(),statTotal.getLinePrice(),MyDate.getMyDateLong()});
+													//发送消息
+													String msgId = StringUtil.generateSequenceNo();
+													sql ="insert into sys_msg_info(msgId,msgType,msgSubType,msgTitle,msgContext,msgTarget,createBy,createOn,issend) values(?,?,?,?,?,?,?,?,?)";
+													String msgTitle ="改签成功("+orgLineName+")";
+													String msgContext="尊敬的用户，"+orgLineName+"，"+orderDate+" "+orderStartTime+"发车的订单，现已成功改签至"+newOrderDate+" "+newOrderStartTime+"。请悉知。"+SystemConstants.COMPANY_INFO;
+													qr.update(conn, sql, new Object[]{msgId,1,0,msgTitle,msgContext,0,"SYSTEM",MyDate.getMyDateLong(),"0"});
+													sql="insert into sys_msg_user(localId,userId,msgId,readFlag,sendPhoneNo,sendTime) values(?,?,?,?,?,?)";
+													qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),passengerId,msgId,0,telephone,MyDate.getMyDateLong()});
+										    	}
+										    }
+										   
+										}
+									}
+								}
+							}
+						}
+					    conn.commit();
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+					if(null!=conn){
+						try {
+							conn.rollback();
+						} catch (SQLException e1) {
+						}
+					}
+					flag = -9999;
+				}finally{
+					if(null!=conn){
+						try {
+							conn.setAutoCommit(true);
+							conn.close();
+						} catch (SQLException e) {
+						}
+					}
+				}
+			}else{
+				return p.getStatus();
+			}
+		}
+		return flag;
+	}
+
+	/**用户申请改签页面**/
+	public Map<String, Object> userChangeTicket(Search search,
+			int currentPageIndex, int pageSize) {
+		super.finit("line_business_order");
+		String sql_filed = " select a.localId,a.lineclassId,a.leaseorderId as leaseOrderNo,a.status,b.nickName,b.telephone,d.lineName,a.cdate,b.passengerid, "
+			+"(select CONCAT(orderdate,' ',orderstarttime)as t1 from line_class_info where lineClassId = a.lineclassid) as oldTime," 
+			+"(select CONCAT(orderdate,' ',orderstarttime)as t1 from line_class_info where lineClassId = a.oldclassid) as newTime " ;
+		String con_sql = " FROM line_business_order a LEFT JOIN passenger_info b ON a.passengerid = b.passengerid LEFT JOIN line_class_info c ON a.lineclassid = c.lineclassid LEFT JOIN line_base_info d ON c.linebaseid = d.linebaseid WHERE 1=1 AND a. STATUS = 1 ";
+		List<Object> paramList = new ArrayList<Object>();
+		if(null!=search){
+			if(StringUtils.hasText(search.getField01())){
+				//订单号
+				con_sql += " AND a.leaseorderId like ? ";
+				paramList.add(SqlBuilder.getSqlLikeValue(search.getField01().trim()));
+			}
+			if(StringUtils.hasText(search.getField02())){
+				//手机号
+				con_sql += " AND b.telephone like ? ";
+				paramList.add(SqlBuilder.getSqlLikeValue(search.getField02().trim()));
+			}
+		}
+		con_sql += " ORDER BY a.cdate ";
+		sql_filed += con_sql;
+		Object[] params = paramList.toArray(new Object[]{});
+		List<UserApplicationChangeVo> list = super.tableDao.queryByPage(UserApplicationChangeVo.class,sql_filed, currentPageIndex,pageSize, params);
+		Map<String, Object> res = new HashMap<String,Object>();
+		Page page = new Page(list," SELECT a.localId "+con_sql,currentPageIndex,pageSize,params);
+		res.put("page", page);
+		res.put("list",list);
+		return res;
+	}
+
+	/**拒绝改签车票**/
+	@Override
+	public int refuceReturnTicket(String localId,String refusemess,String telephone) {
+		int statu = -1;
+		Connection conn = null;
+		try{
+			conn = MyDataSource.getConnect();
+			if(null!=conn){
+				conn.setAutoCommit(false);
+				QueryRunner qr = new QueryRunner();
+				
+				
+				sql = " SELECT lineClassId as oldClassId,passengerId,oldclassid as newClassId FROM line_business_order  WHERE localId = ? ";
+				ParamVo vo_6 = qr.query(conn,sql,new BeanHandler<ParamVo>(ParamVo.class), new Object[]{localId});
+				
+				//更新数据
+				sql = " UPDATE line_business_order SET oldclassid = '',status = 0 WHERE localId = ? ";
+				statu = qr.update(conn, sql, new Object[]{localId});
+				
+				//查找新旧班次ID对应的信息
+				sql = " SELECT * FROM line_class_info WHERE lineClassId = ? ";
+				LineClassEntity oldClass = qr.query(conn,sql,new BeanHandler<LineClassEntity>(LineClassEntity.class), new Object[]{vo_6.getOldClassId()});
+				LineClassEntity newClass = qr.query(conn,sql,new BeanHandler<LineClassEntity>(LineClassEntity.class), new Object[]{vo_6.getNewClassId()});
+				
+				//线路名称
+				sql = " SELECT lineName FROM line_base_info WHERE lineBaseId = ? ";
+				ParamVo vo2 = qr.query(conn,sql,new BeanHandler<ParamVo>(ParamVo.class), new Object[]{oldClass.getLineBaseId()});
+				
+				//发送站内消息
+				String msgId = StringUtil.generateSequenceNo();
+				sql ="insert into sys_msg_info(msgId,msgType,msgSubType,msgTitle,msgContext,msgTarget,createBy,createOn,issend) values(?,?,?,?,?,?,?,?,?)";
+				String msgTitle ="改签失败("+vo2.getLineName()+")";
+				String msgContext="尊敬的用户，"+vo2.getLineName()+"，"+oldClass.getOrderDate()+" "+oldClass.getOrderStartTime()+"发车的订单，改签至"+vo2.getLineName()+" "+newClass.getOrderDate()+" "+newClass.getOrderStartTime()+",改签失败。原因是:"+refusemess+"。请悉知。"+SystemConstants.COMPANY_INFO;
+				qr.update(conn, sql, new Object[]{msgId,1,0,msgTitle,msgContext,0,"SYSTEM",MyDate.getMyDateLong(),"0"});
+				sql="insert into sys_msg_user(localId,userId,msgId,readFlag,sendPhoneNo,sendTime) values(?,?,?,?,?,?)";
+//				qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),"141011123612753049",msgId,0,"15989355062",MyDate.getMyDateLong()});
+				qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),vo_6.getPassengerId(),msgId,0,telephone,MyDate.getMyDateLong()});
+			}
+		}catch (Exception e) {
+			e.printStackTrace();
+			if(null!=conn){
+				try {
+					conn.rollback();
+				} catch (SQLException e1) {
+				}
+			}
+		}finally{
+			if(null!=conn){
+				try {
+					conn.setAutoCommit(true);
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+		}
+		return statu;
+	}
+
+	/**执行改签车票**/
+	public int doReturnTicket(UserApplicationChangeVo changeVo) {
+		Connection conn = null;
+		int statu = -1;
+		try {
+			conn = MyDataSource.getConnect();
+			if(null!=conn){
+				conn.setAutoCommit(false);
+				QueryRunner qr = new QueryRunner();
+				
+				//新旧发车时间和日期
+				String[] oldTime = changeVo.getOldTime().split(" ");
+				String[] newTime = changeVo.getNewTime().split(" ");
+				
+				//1 根据班次ID获取对应的线路信息
+				sql = " SELECT orderStartTime,orderDate,lineBaseId,driverId,vehicleId FROM line_class_info WHERE lineClassId = ? AND delFlag = 0  ";
+				LineClassEntity lineClassEntity = qr.query(conn,sql,new BeanHandler<LineClassEntity>(LineClassEntity.class), new Object[]{changeVo.getLineClassId()});
+				
+				if(null==lineClassEntity){
+					return statu = -2;  //班次不存在
+				}else{
+					//2 看是否有剩余的座位数 
+					sql = " SELECT f_getFreeSeatCount(?,?,?) AS a1 from DUAL ";
+					AppVo_1 vo_1 = qr.query(conn,sql, new BeanHandler<AppVo_1>(AppVo_1.class),new Object[]{newTime[1],newTime[0],
+							lineClassEntity.getLineBaseId()});
+					if(null==vo_1 || Integer.valueOf(vo_1.getA1())<=0){
+						return statu = -3; //没有余座
+					}else{
+						//3  判断线路是否还在运营
+						sql = " SELECT lineBaseId,lineName FROM line_base_info WHERE lineBaseId = ? AND lineType = 1 AND lineStatus = 3 ";
+						ParamVo vo2 = qr.query(conn,sql,new BeanHandler<ParamVo>(ParamVo.class), new Object[]{lineClassEntity.getLineBaseId()});
+						if(null==vo2 || "".equals(vo2.getLineBaseId())){
+							return statu = -4;  //该线路没有在运营
+						}else{
+							//获取line_business_order信息
+							sql = " SELECT lineClassId as oldClassId,passengerId,businessId,oldclassid as newClassId,"
+								+ "(SELECT linebaseid FROM line_class_info WHERE lineClassId = a.lineClassId GROUP BY linebaseid ) AS oldLineBaseId," 
+								+ "(SELECT linebaseid FROM line_class_info WHERE lineClassId = a.oldclassid GROUP BY linebaseid ) AS newLineBaseId " 
+								+ " FROM line_business_order AS a WHERE localId = ? ";
+							ParamVo vo_6 = qr.query(conn,sql,new BeanHandler<ParamVo>(ParamVo.class), new Object[]{changeVo.getLocalId()});
+							if(null==vo_6){
+								return statu = -5; //line_business_order信息异常
+							}else{
+								
+								//4判断改签前后的班次是不是同一条线路,如果不是,不允许改签
+								if(!vo_6.getNewLineBaseId().equals(vo_6.getOldLineBaseId())){
+									return statu = -6;  //不是同一条线路
+								}
+								
+								 //修改line_business_order 将新旧班次ID对换
+								sql ="update line_business_order set lineClassId=?,oldclassid=?,status=2 where localId=?";
+								statu = qr.update(conn, sql, new Object[]{vo_6.getNewClassId(),vo_6.getOldClassId(),changeVo.getLocalId()});
+								if(statu<0){
+									throw new Exception("更新line_business_order异常");
+								}
+								
+								//5 改签成功后需要添加到改签记录
+								
+								//删除对应的班次消费记录
+								sql ="delete from stat_passenger_consum_detail where leaseOrderId=? and lineClassId=?";
+								statu = qr.update(conn, sql, new Object[]{changeVo.getLeaseOrderNo(),changeVo.getLineClassId()});
+								if(statu<0){
+									throw new Exception("删除stat_passenger_consum_detail异常");
+								}
+								
+								//查询乘客信息
+								sql = "select p.passengerId,p.displayId,p.nickName,p.telephone from passenger_info p  where p.passengerId=?";
+								PassengerInfoEntity passengerInfoEntity = qr.query(conn, sql, new BeanHandler<PassengerInfoEntity>(PassengerInfoEntity.class),new Object[]{vo_6.getPassengerId()});
+								
+								//插入改签记录
+								sql ="INSERT INTO passenger_change_order(id,orgLineBaseId,orgLineName,passengerId,displayId,nickName,telephone,orgLeaseOrderId,orgClassId,orgOrderStartTime,orgOrderDate,newLineBaseId,newLineName,newLeaseOrderId,newClassId,newOrderStartTime,newOrderDate,createBy,createOn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+								statu = qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),vo2.getLineBaseId(),vo2.getLineName(),passengerInfoEntity.getPassengerId(),
+										passengerInfoEntity.getDisplayId(),passengerInfoEntity.getNickName(),passengerInfoEntity.getTelephone(),changeVo.getLeaseOrderNo(),
+										vo_6.getOldClassId(),oldTime[1],oldTime[0],vo2.getLineBaseId(),vo2.getLineName(),changeVo.getLeaseOrderNo(),vo_6.getNewClassId(),newTime[1],newTime[0],changeVo.getUserId(),MyDate.getMyDateLong()});
+								if(statu<1){
+									statu = -7;//插入改签记录失败
+									throw new Exception("插入改签记录失败常");
+								}
+								
+								//6 添加支出记录
+								//查询原始收入统计
+							    sql="select a.consumeLimit,a.discountRate,a.leaseOrderNo,a.businessId,a.linePrice from stat_total a where a.passengerId=? and a.lineBaseId=? and a.orderDate=? and a.orderStartTime=? and a.lineClassId=? and a.leaseOrderNo=?";
+							    Object[] params = new Object[]{vo_6.getPassengerId(),vo2.getLineBaseId(),oldTime[0],oldTime[1],vo_6.getOldClassId(),changeVo.getLeaseOrderNo()};
+							    List<StatTotalEntity> statTotalList = qr.query(conn, sql, new BeanListHandler<StatTotalEntity>(StatTotalEntity.class),params);
+							    if(false==CollectionUtils.isEmpty(statTotalList)){
+							    	//存在记录,说明实际支付金额大于0元
+							    	StatTotalEntity statTotal = statTotalList.get(0);
+							    	if(null!=statTotal){
+							    		//添加支出记录
+										StatOutEntity outEntity = new StatOutEntity();
+										outEntity.setStatOutId(StringUtil.generateSequenceNo());
+										outEntity.setLeaseOrderNo(changeVo.getLeaseOrderNo());
+										outEntity.setOperatTime(MyDate.getMyDateLong());
+										outEntity.setOperater(changeVo.getUserId());
+										//取收入统计的消费金额
+										outEntity.setOutMoney(statTotal.getConsumeLimit());
+										//支出类型 1:退票   2:改签
+										outEntity.setOutType(2);
+										outEntity.setOrderDate(oldTime[0]);
+										outEntity.setOrderStartTime(oldTime[1]);
+										outEntity.setPassengerId(passengerInfoEntity.getPassengerId());
+										outEntity.setLineBaseId(vo2.getLineBaseId());
+										outEntity.setLineSubType(0);
+										outEntity.setDriverId(lineClassEntity.getDriverId());
+										outEntity.setVehicleId(lineClassEntity.getVehicleId());
+										outEntity.setLineClassId(vo_6.getOldClassId());
+										outEntity.setBusinessId(statTotal.getBusinessId());
+										sql = "insert into stat_out(statOutId,orderDate,orderStartTime,lineSubType,lineBaseId,passengerId,driverId,outMoney,businessId,vehicleId,operatTime,operater,leaseOrderNo,lineClassId,outType) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+									    statu = qr.update(conn, sql,new Object[]{outEntity.getStatOutId(),outEntity.getOrderDate(),outEntity.getOrderStartTime(),outEntity.getLineSubType(),outEntity.getLineBaseId(),outEntity.getPassengerId(),outEntity.getDriverId(),outEntity.getOutMoney(),outEntity.getBusinessId(),outEntity.getVehicleId(),outEntity.getOperatTime(),outEntity.getOperater(),outEntity.getLeaseOrderNo(),outEntity.getLineClassId(),outEntity.getOutType()});
+									    if(statu<1){
+											statu = -8;//添加支出统计失败
+											throw new Exception("加支出统计失败");
+										}
+									    
+									    //7 添加收入统计 --记录新的商家
+									    sql = " SELECT lineclass.driverId,lineclass.vehicleId,lineorder.businessId AS lineClassId "
+									    		+" FROM line_class_info AS  lineclass LEFT JOIN line_business_order AS lineorder ON lineclass.lineClassId = lineorder.lineClassId "
+									    		+" WHERE lineclass.lineClassId = ? AND lineclass.delFlag = 0 AND lineclass.orderDate = ? AND lineclass.orderStartTime = ? ";
+										lineClassEntity = qr.query(conn,sql,new BeanHandler<LineClassEntity>(LineClassEntity.class), new Object[]{vo_6.getNewClassId(),newTime[0],newTime[1]});
+									    
+									    sql="INSERT INTO stat_total(statTotalId,orderDate,orderStartTime,lineSubType,lineBaseId,passengerId,driverId,consumeLimit,discountRate,buyType,vehicleId,leaseOrderNo,lineClassId,businessId,linePrice,operatTime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)";
+										statu = qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),newTime[0],newTime[1],0,vo2.getLineBaseId(),passengerInfoEntity.getPassengerId(),
+												lineClassEntity.getDriverId(),statTotal.getConsumeLimit(),statTotal.getDiscountRate(),2,lineClassEntity.getVehicleId(),statTotal.getLeaseOrderNo(),vo_6.getNewClassId(),
+												lineClassEntity.getLineClassId(),statTotal.getLinePrice(),MyDate.getMyDateLong()});  //lineClassEntity.getLineClassId() 是lineorder.businessId AS lineClassId
+										if(statu<1){
+											statu = -9;//添加收入统计失败
+											throw new Exception("添加收入统计失败");
+										}
+										
+							    	}
+							
+							    }
+							    
+								//发送站内消息
+								String msgId = StringUtil.generateSequenceNo();
+								sql ="insert into sys_msg_info(msgId,msgType,msgSubType,msgTitle,msgContext,msgTarget,createBy,createOn,issend) values(?,?,?,?,?,?,?,?,?)";
+								String msgTitle ="改签成功("+vo2.getLineName()+")";
+								String msgContext="尊敬的用户，"+vo2.getLineName()+"，"+oldTime[0]+" "+oldTime[1]+"发车的订单，现已成功改签至"+vo2.getLineName()+" "+newTime[0]+" "+newTime[1]+"。请悉知。"+SystemConstants.COMPANY_INFO;
+								qr.update(conn, sql, new Object[]{msgId,1,0,msgTitle,msgContext,0,"SYSTEM",MyDate.getMyDateLong(),"0"});
+								sql="insert into sys_msg_user(localId,userId,msgId,readFlag,sendPhoneNo,sendTime) values(?,?,?,?,?,?)";
+//								qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),"141011123612753049",msgId,0,"15989355062",MyDate.getMyDateLong()});
+								qr.update(conn, sql, new Object[]{StringUtil.generateSequenceNo(),passengerInfoEntity.getPassengerId(),msgId,0,passengerInfoEntity.getTelephone(),MyDate.getMyDateLong()});
+							    
+							}
+						}
+					}
+			
+				}
+			}
+			if(conn!=null){
+				conn.commit();
+			}
+		}catch (Exception e) {
+			e.printStackTrace();
+			if(null!=conn){
+				try {
+					conn.rollback();
+				} catch (SQLException e1) {
+				}
+			}
+		}finally{
+			if(null!=conn){
+				try {
+					conn.setAutoCommit(true);
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+		}
+		return statu;
+	}
+
+	/**判断是否存在该改签记录,如果存在,说明已经改签过了,不允许改签**/
+	public synchronized  int checkChangeTicket(UserApplicationChangeVo changeVo) {
+		//synchronized:同步锁
+		Connection conn = null;
+		int statu = -1;
+		try {
+			conn = MyDataSource.getConnect();
+			conn.setAutoCommit(false);
+			QueryRunner qr = new QueryRunner();
+			sql = " SELECT lineClassId as oldClassId,passengerId,businessId,oldclassid as newClassId "
+				+ " FROM line_business_order AS a WHERE localId = ? ";
+			ParamVo vo_6 = qr.query(conn,sql,new BeanHandler<ParamVo>(ParamVo.class), new Object[]{changeVo.getLocalId()});
+			if(null!=vo_6){
+				//SELECT id FROM passenger_change_order WHERE passengerId = '140930131729292038' AND orgLeaseOrderId = '141027267051' AND orgClassId = '141015094318284064' AND newClassId = '141015094318285065' 
+				sql = " SELECT id AS a1 FROM passenger_change_order WHERE passengerId = ? AND orgLeaseOrderId = ? AND orgClassId = ? AND newClassId = ?  ";
+				List<String> condition = new ArrayList<String>();
+				condition.add(vo_6.getPassengerId());
+				condition.add(changeVo.getLeaseOrderNo());
+				condition.add(vo_6.getOldClassId());
+				condition.add(vo_6.getNewClassId());
+				List<AppVo_1> vo1list = qr.query(conn, sql, new BeanListHandler<AppVo_1>(AppVo_1.class), condition.toArray());
+				if(null==vo1list || vo1list.size()==0){
+					statu = 0;//不存在对应的纪录
+				}else{
+					statu = 2;//存在记录
+				}
+			}
+			conn.commit();
+		}catch (Exception e) {
+		}finally{
+			if(null!=conn){
+				try {
+					conn.setAutoCommit(true);
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+		}
+		return statu;
+	}
+}

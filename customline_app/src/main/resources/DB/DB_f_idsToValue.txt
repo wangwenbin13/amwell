@@ -1,0 +1,61 @@
+DELIMITER $$
+
+DROP FUNCTION IF EXISTS `f_changeIdsToValues`$$
+
+CREATE  FUNCTION f_changeIdsToValues(inputstring VARCHAR(1000)) RETURNS VARCHAR(500)
+
+DETERMINISTIC
+
+BEGIN
+
+    DECLARE strlen INT;
+    
+    DECLARE last_index INT;
+    
+    DECLARE cur_index INT;
+    
+    DECLARE cur_char VARCHAR(200);
+    
+    DECLARE result VARCHAR(500) DEFAULT '';
+    
+    DECLARE val VARCHAR(500) DEFAULT '';
+    
+    DECLARE len INT;
+    
+    SET cur_index=1;
+    
+    SET last_index=0;
+    
+    SET strlen=LENGTH(inputstring);  
+   
+    WHILE(cur_index<=strlen) DO    
+    
+        IF SUBSTRING(inputstring FROM cur_index FOR 1)=',' OR cur_index=strlen THEN
+        
+            SET len=cur_index-last_index-1;
+            
+            IF cur_index=strlen THEN
+            
+               SET len=len+1;
+               
+            END IF;
+            
+            SET result := (SUBSTRING(inputstring FROM (last_index+1) FOR len));
+            
+            SET result := (SELECT stationName FROM line_station_info WHERE stationinfoid =  result);
+            
+            SET val := CONCAT(val,'-',result);
+            
+            SET last_index=cur_index;
+            
+        END IF;
+        
+        SET cur_index=cur_index+1;
+    
+    END WHILE;
+    
+    RETURN SUBSTRING(val, 2,LENGTH(val));
+    
+END$$
+
+DELIMITER ;

@@ -1,0 +1,48 @@
+CREATE OR REPLACE VIEW v_passenger_info AS
+
+SELECT 
+  a.*,
+   CASE WHEN(SELECT 
+    SUM(b.moneyLimit) 
+  FROM
+    stat_passenger_recharge b 
+  WHERE a.`passengerId` = b.passengerId) IS NULL THEN '0' ELSE (SELECT 
+    SUM(b.moneyLimit) 
+  FROM
+    stat_passenger_recharge b 
+  WHERE a.`passengerId` = b.passengerId)  END AS cz,
+  
+  CASE WHEN 
+  (SELECT 
+    SUM(c.leaseLimit) 
+  FROM
+    stat_passenger_consum_lease c 
+  WHERE a.`passengerId` = c.passengerId) IS NULL THEN '0' ELSE (SELECT 
+    SUM(c.leaseLimit) 
+  FROM
+    stat_passenger_consum_lease c 
+  WHERE a.`passengerId` = c.passengerId) END AS xf,
+  
+  (( CASE WHEN(SELECT 
+    SUM(b.moneyLimit) 
+  FROM
+    stat_passenger_recharge b 
+  WHERE a.`passengerId` = b.passengerId) IS NULL THEN '0' ELSE (SELECT 
+    SUM(b.moneyLimit) 
+  FROM
+    stat_passenger_recharge b 
+  WHERE a.`passengerId` = b.passengerId) END) - (CASE WHEN 
+  (SELECT 
+    SUM(c.leaseLimit) 
+  FROM
+    stat_passenger_consum_lease c 
+  WHERE a.`passengerId` = c.passengerId) IS NULL THEN '0' ELSE (SELECT 
+    SUM(c.leaseLimit) 
+  FROM
+    stat_passenger_consum_lease c 
+  WHERE a.`passengerId` = c.passengerId) END)) AS ye
+  
+FROM
+  passenger_info a 
+  
+  

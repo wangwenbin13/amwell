@@ -1,0 +1,29 @@
+package com.pig84.ab.vo.coupon;
+
+import java.util.List;
+import com.pig84.ab.dao.ICouponRuleDao;
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * 推荐时间规则
+ * @author gxt
+ *
+ */
+public class RecommendTimeRule extends Rule {
+	
+	private ICouponRuleDao couponRuleDao;
+
+	public RecommendTimeRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public PassengerInfo filter(Object obj,PassengerInfo passenger){
+		this.couponRuleDao=(ICouponRuleDao)obj;
+		List<PassengerInfo> voList=couponRuleDao.getReOldPassenger(passenger.getPassengerId(),getTheValue(),getTheCondition());
+		if(null!=voList&&voList.size()==1){
+			return voList.get(0);
+		}
+		return null;
+	}
+}

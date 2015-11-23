@@ -1,0 +1,64 @@
+#config
+
+#Connect type,0:tomcat,1:weblogic
+connType = 0
+
+#Weblogic t3 Address
+t3 = t3://localhost:8080
+
+#DataBase type,0:mysql,1:Oracle
+dbType = 0
+
+#Memcached address
+memAddress = 127.0.0.1
+memPort = 11211
+
+memAddress1 = 127.0.0.1
+memPort1 = 11211
+
+#KindEditorServlet dir
+editorUpload = /data/webapp/uploads/
+
+#Is Print SQL,1:print,0:not print
+printSQL = 1
+
+#Web address
+webAddress = http://localhost:8080
+
+#Domain flag,0:localhost,1:www
+domainFlag =0
+
+#postSendMsg url
+postSendMsgUrl=http://183.57.43.185:39470/msg/msg/postSendMsg.action
+
+#upload ftp server
+ftp.image.url=183.57.43.185
+ftp.image.port=39570
+ftp.image.username=ftpadmin
+ftp.image.password=Dec_ftp@pig,84&*();
+
+#upload root identify url
+ftp.image.root=image
+ftp.image.root.dingZhiBus=dingZhiBus
+ftp.image.root.busonline=busonline
+ftp.image.root.opic=o_pic
+ftp.image.root.hpic=h_pic
+ftp.image.root.spic=s_pic
+
+#image download http server
+http.root.url=http\://183.57.43.185\:39571
+
+#weixin push message url
+weixin.push.message.url=http\://183.57.43.185\:80/busOnline/sendPushMessageAction/sendBcLineMessage
+
+#http pic url ceshi
+http.pic.url=/home/ftptest/apache-tomcat-6.0.43/webapps/busonline/
+http.pic.ip=http://192.168.9.6:17530/
+http.pic.directory=busonline
+http.image.root.opic=o_pic
+
+#http pic url waiwang
+#http.pic.url=/web/amwell/ftp/apache-tomcat-6.0.43/webapps/busonline/
+#http.pic.ip=http://appftp.pig84.com/
+#http.pic.directory=busonline
+#http.image.root.opic=o_pic

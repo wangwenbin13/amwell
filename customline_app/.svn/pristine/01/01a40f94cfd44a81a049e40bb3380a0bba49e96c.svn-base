@@ -1,0 +1,245 @@
+package com.pig84.ab.dao.impl;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.handlers.BeanHandler;
+import org.apache.commons.dbutils.handlers.BeanListHandler;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Repository;
+
+import com.pig84.ab.dao.BaseDao;
+import com.pig84.ab.dao.IStationInfoDao;
+import com.pig84.ab.utils.Conn;
+import com.pig84.ab.vo.StationInfo;
+import com.pig84.ab.vo.StationUnion;
+import com.pig84.ab.vo.bean.AppVo_2;
+import com.pig84.ab.vo.bean.AppVo_3;
+
+@Repository
+public class StationInfoDao extends BaseDao implements IStationInfoDao{
+
+	@Override
+	public List<StationInfo> listByLineId(String lineId){
+		String sql = "select * from pb_station where lineId=? and available=0 and type!=2 order by sortNum";
+		Object[] params = new Object[1];
+		params[0] = lineId;
+		List<StationInfo> stationList = super.queryList(StationInfo.class, sql, params);
+		return stationList;
+	}
+	
+	public StationInfo getLineFirstStation(String lineId){
+		Connection conn = Conn.get();
+		String sql = "select * from pb_station where lineId=? and available=0 and type!=2 and sortNum=0";
+		Object[] params = new Object[1];
+		params[0] = lineId;
+		QueryRunner queryRunner = new QueryRunner();
+		try {
+			return queryRunner.query(conn, sql, new BeanHandler<StationInfo>(StationInfo.class), params);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	public List<StationInfo> listByLineId(Connection conn, String lineId)throws SQLException{
+		String sql = "select * from pb_station where lineId=? and available=0 and type!=2 order by sortNum";
+		Object[] params = new Object[1];
+		params[0] = lineId;
+		QueryRunner queryRunner = new QueryRunner();
+		List<StationInfo> stationList = queryRunner.query(conn, sql, new BeanListHandler<StationInfo>(StationInfo.class), params);
+		return stationList;
+	}
+	
+	/**
+	 * 站点搜索
+	 */
+	public List<AppVo_3> searchStation(String keywords) {
+		String sql = "select id as a1,name as a2 from pb_station where name like ?";
+		Object[] params=new Object[1];
+		params[0]="%"+keywords+"%";
+		List<AppVo_3> list = queryList(AppVo_3.class, sql,params);
+		return list;
+	}
+	
+	/**站点搜索**/
+	public List<AppVo_2> getStation(String sName){
+		String sql = "select id as a1,name as a2 from pb_station";
+		List<AppVo_2> list = null;
+		if(sName!=null && !"".equals(sName)){
+			sql += " where name like ?";
+			Object[] params=new Object[1];
+			params[0]="%"+sName+"%";
+			list = queryList(AppVo_2.class, sql,params);
+		}
+		else{
+			list = queryList(AppVo_2.class, sql);
+		}
+		return list;
+	}
+	
+	/**根据名字完全匹配成功**/
+	public List<StationInfo> queryStationByName(String sName) {
+		List<StationInfo> listStationInfos  = null;
+		if(!StringUtils.isEmpty(sName)){
+			String sql = " SELECT id,baiduLng,baiduLat FROM pb_station WHERE name = ? ";
+			Object[] params = new Object[1];
+			params[0] = sName;
+			listStationInfos = queryList(StationInfo.class, sql, params);
+		}
+		return listStationInfos;
+	}
+	
+	/**根据站点ID获取站点信息**/
+	public List<StationInfo> queryStationById(String allStationIds) {
+		List<StationInfo> list = null;
+		String sql = null;
+		if(!StringUtils.isEmpty(allStationIds)){
+			sql = " SELECT id,name,baiduLng,baiduLat FROM pb_station WHERE 1=1 ";
+			allStationIds = allStationIds.substring(0, allStationIds.length()-1);
+			String[] strs=allStationIds.split(",");
+			StringBuffer sb=new StringBuffer();
+			List<String> paramList=new ArrayList<String>();
+			for (String s : strs) {
+				paramList.add(s);
+				sb.append("?,");
+			}
+			sql += " AND id in ("+sb.substring(0,sb.length()-1)+") ";
+			list = queryList(StationInfo.class, sql, paramList.toArray());
+		}
+		return list;
+	}
+	
+	/**(根据名字)--两表联合查询**/
+	public List<StationUnion> queryUnionByName(String name) {
+		List<StationUnion> list = null;
+		if(!StringUtils.isEmpty(name)){
+			String sql = " SELECT a.id AS id,a.name as stationName,a.baiduLng as loni,a.baiduLat as lati,'1' as type FROM pb_station AS a WHERE a.name = ? UNION SELECT b.appliStationId AS id,b.stationName,b.loni,b.lati,'2' AS type FROM line_user_application_station_new AS b WHERE b.stationName = ? ";
+			Object[] params = new Object[2];
+			params[0] = name;
+			params[1] = name;
+			list = queryList(StationUnion.class, sql, params);
+		}
+		return list;
+	}
+
+	@Override
+	public List<StationInfo> listByName(String name){
+		String sql = "select * from pb_station where name like ? and available=0 and type!=2 order by sortNum";
+		Object[] params = new Object[1];
+		params[0] = "%"+name+"%";
+		List<StationInfo> stationList = super.queryList(StationInfo.class, sql, params);
+		return stationList;
+	}
+
+	@Override
+	public StationInfo getById(String id) {
+		if(StringUtils.isEmpty(id)){
+			return null;
+		}
+		String sql = "select * from pb_station where id = ?";
+		Object[] params = new Object[1];
+		params[0] = id;
+		StationInfo stationInfo = super.queryBean(StationInfo.class, sql, params);
+		return stationInfo;
+	}
+	
+	@Override
+	public StationInfo getById(Connection conn,String id) throws SQLException{
+		String sql = "select * from pb_station where id = ? and available=0 order by sortNum";
+		Object[] params = new Object[1];
+		params[0] = id;
+		QueryRunner queryRunner = new QueryRunner();
+		StationInfo stationInfo = queryRunner.query(conn, sql, new BeanHandler<StationInfo>(StationInfo.class), params);
+		return stationInfo;
+	}
+	
+	/**
+	 * 根据线路Id来组建其站点的Id序列
+	 * 
+	 * @param lineId
+	 * 
+	 * @return
+	 * 
+	 */
+	@Override
+	public String generateStationIdArrayByLineId(String lineId){
+		List<StationInfo> stationInfoList = listByLineId(lineId);
+		StringBuffer stationIdArray = new StringBuffer();
+		if(stationInfoList!=null){
+			for(int index=0;index<stationInfoList.size();index++){
+				StationInfo stationInfo = stationInfoList.get(index);
+				if(stationInfo.getType()!=2){
+					stationIdArray.append(stationInfo.getId());
+					if(index<stationInfoList.size()-1){
+						stationIdArray.append(",");
+					}
+				}
+			}
+		}
+		return stationIdArray.toString();
+	}
+	
+	@Override
+	public String generateStationIdArrayByLineId(Connection conn,String lineId)throws SQLException{
+		List<StationInfo> stationInfoList = listByLineId(conn,lineId);
+		StringBuffer stationIdArray = new StringBuffer();
+		if(stationInfoList!=null){			
+			for(int index=0;index<stationInfoList.size();index++){
+				StationInfo stationInfo = stationInfoList.get(index);
+				if(stationInfo.getType()!=2){
+					stationIdArray.append(stationInfo.getId());
+					if(index<stationInfoList.size()-1){
+						stationIdArray.append(",");
+					}
+				}
+			}
+		}
+		return stationIdArray.toString();
+	}
+	
+	/**
+	 * 根据线路id来组建其站点的名称序列
+	 * @param lineId
+	 * @return
+	 */
+	@Override
+	public String generateStationNameArrayByLineId(String lineId){
+		List<StationInfo> stationInfoList = listByLineId(lineId);
+		StringBuffer stationIdArray = new StringBuffer();
+		if(stationInfoList!=null){
+			for(int index=0;index<stationInfoList.size();index++){
+				StationInfo stationInfo = stationInfoList.get(index);
+				if(stationInfo.getType()!=2){
+					stationIdArray.append(stationInfo.getName());
+					if(index<stationInfoList.size()-1){
+						stationIdArray.append("-");
+					}
+				}
+			}
+		}
+		return stationIdArray.toString();
+	}
+	
+	@Override
+	public String generateStationNameArrayByLineId(Connection conn,String lineId)throws SQLException{
+		List<StationInfo> stationInfoList = listByLineId(conn,lineId);
+		StringBuffer stationIdArray = new StringBuffer();
+		if(stationInfoList!=null){
+			for(int index=0;index<stationInfoList.size();index++){
+				StationInfo stationInfo = stationInfoList.get(index);
+				if(stationInfo.getType()!=2){
+					stationIdArray.append(stationInfo.getName());
+					if(index<stationInfoList.size()-1){
+						stationIdArray.append("-");
+					}
+				}
+			}
+		}
+		return stationIdArray.toString();
+	}
+	
+}

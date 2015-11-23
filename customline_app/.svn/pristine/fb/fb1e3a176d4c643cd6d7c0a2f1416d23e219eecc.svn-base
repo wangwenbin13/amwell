@@ -1,0 +1,39 @@
+package com.pig84.ab.service.impl;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.pig84.ab.dao.IGiftDao;
+import com.pig84.ab.service.IGiftService;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_1_list;
+import com.pig84.ab.vo.bean.AppVo_2;
+
+/**
+ * 优惠券相关
+ * @author 
+ *
+ */
+@Service("giftService")
+public class GiftServiceImpl implements IGiftService {
+
+	@Autowired
+	private IGiftDao gifteDao;
+	
+	/**查询待领取优惠券，同时系统自动领取上下线时间段的系统优惠券**/
+	public AppVo_1_list saveSysGiftInfo(String passengerId,String telephone,String couponType,int pageSize,int currentPage){
+		return gifteDao.saveSysGiftInfo(passengerId,telephone, couponType,pageSize,currentPage);
+	}
+	
+	/**领取优惠券，保存优惠券领取信息并返回剩余可领取状态**/
+	public AppVo_2 saveCouponPassenger(String passengerId,String telephone,String couponGiftId){
+		return gifteDao.saveCouponPassenger(passengerId,telephone,couponGiftId);
+	}
+	
+	/**获取报价信息**/
+	public AppVo_1 getCouponValueById(String counponTeleId){
+		return gifteDao.getCouponValueById(counponTeleId);
+	}
+	
+}

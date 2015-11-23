@@ -1,0 +1,61 @@
+package com.pig84.ab.service.impl;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.pig84.ab.dao.ICouponDao;
+import com.pig84.ab.service.ICouponService;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_6;
+
+/**
+ * 优惠券相关
+ * @author 
+ *
+ */
+@Service("couponService")
+public class CouponServiceImpl implements ICouponService {
+	
+	@Autowired
+	private ICouponDao couponDao;
+
+	/**根据用户电话查询所有的未使用优惠券**/
+	@Override
+	public List<AppVo_6> getCoupon(String userId,String telephone, int pageSize,
+			int currentPage) {
+		return couponDao.getCoupon(null,null,null,userId,telephone, pageSize, currentPage,null);
+	}
+	
+	/**
+	 * 查询在有效期内的可用优惠券列表
+	 *   . 按结束时间由近到远排序
+	 *   . 相同时间的，按优惠券价格排序，由小到大
+	 */
+	public List<AppVo_6> getMyUsableCoupon(String userId,String telephone,int currentIndex,int theCount){
+		return couponDao.getMyUsableCoupon(userId, telephone, currentIndex, theCount);
+	}
+	
+	/**
+	 * 查询未到有效期开始时间的优惠券列表
+	 *    . 按开始时间由近到远
+	 *    . 相同时间的，按优惠券价格排序，由小到大
+	 */
+	public List<AppVo_6> getUnStartCoupon(String userId,String telephone,int currentIndex,int theCount){
+		return couponDao.getUnStartCoupon(userId, telephone, currentIndex, theCount);
+	}
+	
+	/**
+	 * 查询已过期的优惠券列表
+	 *    . 按结束时间由近到远
+	 */
+	public List<AppVo_6> getExpiredCoupon(String userId,String telephone,int currentIndex,int theCount){
+		return couponDao.getExpiredCoupon(userId, telephone, currentIndex, theCount);
+	}
+	
+	/**获取优惠券面值信息**/
+	public AppVo_1 getCouponValueById(String counponTeleId){
+		return couponDao.getCouponValueById(counponTeleId);
+	}
+}

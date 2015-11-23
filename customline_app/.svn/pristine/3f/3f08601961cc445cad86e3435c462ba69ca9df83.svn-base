@@ -1,0 +1,684 @@
+package com.pig84.ab.action;
+
+import java.io.IOException;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.json.JSONException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.pig84.ab.cache.UserCache;
+import com.pig84.ab.service.IDriverService;
+import com.pig84.ab.service.IGiftService;
+import com.pig84.ab.service.IISheKouService;
+import com.pig84.ab.service.ILineService;
+import com.pig84.ab.service.ILoginAndRegisterService;
+import com.pig84.ab.service.IRecommendAwardService;
+import com.pig84.ab.utils.CacheUtil;
+import com.pig84.ab.utils.CookieUtil;
+import com.pig84.ab.utils.CouponThread;
+import com.pig84.ab.utils.Event;
+import com.pig84.ab.utils.Html;
+import com.pig84.ab.utils.IdGenerator;
+import com.pig84.ab.utils.Message;
+import com.pig84.ab.utils.MyDate;
+import com.pig84.ab.utils.PropertyManage;
+import com.pig84.ab.utils.Sha1Utils;
+import com.pig84.ab.utils.ThreadPoolUtil;
+import com.pig84.ab.vo.ErrLog;
+import com.pig84.ab.vo.PassengerInfo;
+import com.pig84.ab.vo.User;
+import com.pig84.ab.vo.UserIdMap;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_13;
+import com.pig84.ab.vo.bean.AppVo_14;
+import com.pig84.ab.vo.bean.AppVo_1_list;
+import com.pig84.ab.vo.bean.AppVo_2;
+import com.pig84.ab.vo.bean.AppVo_3;
+import com.pig84.ab.vo.bean.AppVo_4;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_7;
+import com.pig84.ab.vo.bean.AppVo_8;
+
+/**
+ * 登录注册相关
+ * 
+ * @author zhangqiang
+ * 
+ */
+@ParentPackage("no-interceptor")
+@Namespace("/app_loginAndRegister")
+@SuppressWarnings("all")
+@ExceptionMappings( { @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class LoginAndRegister extends BaseAction {
+
+	@Autowired
+	private ILoginAndRegisterService loginAndRegisterService;
+
+	@Autowired
+	private ILineService lineService;
+
+	@Autowired
+	private IISheKouService ishekou;
+
+	@Autowired
+	private IDriverService driverService;
+
+	@Autowired
+	private IRecommendAwardService recommendAwardService;
+
+	@Autowired
+	private IGiftService giftService;
+
+	/**
+	 * 注册
+	 * 
+	 * @return
+	 * @throws IOException
+	 * @throws JSONException
+	 */
+	@Action(value = "register", results = { @Result(type = "json") })
+	public String register() throws IOException, JSONException {
+
+		String imei = request.getParameter("imei"); // 用户昵称
+		String nickName = request.getParameter("nickName"); // 用户昵称
+		String sex = request.getParameter("sex"); // 性别
+		String telephone = request.getParameter("telephone"); // 手机号码
+		String passWord = request.getParameter("passWord"); // 密码
+		String headerPicUrl = request.getParameter("headerPicUrl"); // 头像url
+		String cityName = request.getParameter("cityName");//获取城市名称
+		if (null != headerPicUrl && !"".equals(headerPicUrl)) {
+			String headerIp = PropertyManage.get("header.pic.ip");// IP地址
+			headerPicUrl = headerPicUrl.replace(headerIp + "/", "");
+		}
+		String registerTime = MyDate.Format.DATETIME.now(); // 注册时间
+		String twoCodeValue = IdGenerator.seq(); // 二维码唯一标识
+
+		PassengerInfo user = new PassengerInfo();
+		user.setNickName(nickName);
+		user.setSex(sex);
+		user.setTelephone(telephone);
+		user.setPassWord(Sha1Utils.encrypt(telephone + "&" + passWord));// 密码加密规则：手机号码+"&"+密码
+		user.setRegisterTime(registerTime);
+		user.setTwoCodeValue(twoCodeValue);
+		user.setHeaderPicUrl(headerPicUrl);
+		user.setComments(passWord);
+		if (imei != null && !"null".equals(imei) && !"".equals(imei)) {
+			user.setImei(imei);
+		}
+
+		
+		
+		if(!StringUtils.isEmpty(cityName)){
+			AppVo_4 area = loginAndRegisterService.getSysArea(cityName);
+			user.setCityCode(area.getA1());
+			user.setProvinceCode(area.getA3());
+			user.setCityName(area.getA2());
+		}else{
+			user.setCityCode("1607");
+			user.setProvinceCode("19");
+			user.setCityName("深圳市");
+		}
+		String flag = loginAndRegisterService.register(user);
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1(flag);
+
+		if ("1".equals(flag)) {// 注册成功,添加im用户
+			this.driverService.addImUser(user.getPassengerId(), "1");// 保存乘客信息
+
+			// 调用优惠券规则检查及发放
+			if (!"1".equals(user.getSex())) {
+				user.setSex("0");
+			}
+			
+			Event.REGISTER.trigger("user", user);
+		}
+		write(vo);
+		return null;
+
+	}
+
+	private PassengerInfo registUser(HttpServletRequest request) throws Exception {
+		String telephone = request.getParameter("mobile"); // 手机号码
+		String registerTime = MyDate.Format.DATETIME.now(); // 注册时间
+		String twoCodeValue = IdGenerator.seq(); // 二维码唯一标识
+		String cityName = request.getParameter("cityName");//获取城市名称
+		PassengerInfo user = new PassengerInfo();
+		user.setNickName(telephone);
+		user.setSex("0");
+		user.setTelephone(telephone);
+		user.setPassWord(Sha1Utils.encrypt(telephone + ""));// 密码加密规则：手机号码+"&"+密码
+		user.setComments(telephone);
+		user.setRegisterTime(registerTime);
+		user.setTwoCodeValue(twoCodeValue);
+
+		if(!StringUtils.isEmpty(cityName)){
+			AppVo_4 area = loginAndRegisterService.getSysArea(cityName);
+			user.setCityCode(area.getA1());
+			user.setProvinceCode(area.getA3());
+			user.setCityName(area.getA2());
+		}else{
+			user.setCityCode("1607");
+			user.setProvinceCode("19");
+			user.setCityName("深圳市");
+		}
+
+		String flag = loginAndRegisterService.register(user);
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1(flag);
+
+		if ("1".equals(flag)) {// 注册成功,添加im用户
+			this.driverService.addImUser(user.getPassengerId(), "1");// 保存乘客信息
+
+			// 调用优惠券规则检查及发放
+			if (!"1".equals(user.getSex())) {
+				user.setSex("0");
+			}
+			Event.REGISTER.trigger("user", user);
+			return user;
+		}
+		return null;
+	}
+
+	/**
+	 * 登录
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "login", results = { @Result(type = "json") })
+	public String login() throws Exception {
+		String telephone = request.getParameter("mobile");
+		String passWord_ = request.getParameter("passWord");
+		String code = request.getParameter("code");
+		PassengerInfo appUser = new PassengerInfo();
+		if ((passWord_ == null || "".equals(passWord_))&& (code != null && !"".equals(code))) {
+			// 新版登录，手机号码+验证码
+			String cacheCode = CacheUtil.getCache(telephone);
+			String vipTel = PropertyManage.get("vip.telephone");
+			if (vipTel.contains(telephone)) {// 加入张坤作为白名单 给appStore提供审批
+				CacheUtil.removeCache(telephone);
+				appUser = loginAndRegisterService.getPassengerByTel(telephone);
+			} else {
+				if (cacheCode == null || "".equals(cacheCode)) {// 验证码失效
+					appUser.setFlag("6");// 验证码失效
+				} else if (!cacheCode.equals(code)) {
+					appUser.setFlag("7");// 验证码 错误      
+					
+					//只允许验证3次
+					String key_check = "check_"+telephone;
+					String times = CacheUtil.getCache(key_check);
+					if(times == null || "".equals(times)){
+						CacheUtil.setCache(key_check, "1", 120);//验证次数，第一次
+					}else{
+						int count = Integer.valueOf(times);
+						if(count>=3){
+							CacheUtil.removeCache(telephone);
+							CacheUtil.removeCache(key_check);
+						}else{
+							count += 1;
+							CacheUtil.updateCache(key_check, String.valueOf(count));
+						}
+					}
+					
+				} else if (cacheCode.equals(code)) {
+					CacheUtil.removeCache(telephone);
+					appUser = loginAndRegisterService.getPassengerByTel(telephone);
+					if ("1".equals(appUser.getFlag())) {// 新用户注册发优惠劵
+						appUser = registUser(this.request);
+						if (null!=appUser) {// 注册成功
+							appUser = loginAndRegisterService.getPassengerByTel(telephone);
+							appUser.setFlag("0");
+							
+						}
+					}
+				}
+			}
+		} else {
+			// 老版登录，手机号码+密码
+			String passWord = Sha1Utils.encrypt(telephone + "&" + passWord_);
+			String terminal = request.getParameter("terminal");// 设备类型 1-android
+			String imei = request.getParameter("imei");
+			appUser = loginAndRegisterService.login(telephone, passWord,
+					terminal, passWord_, imei);
+		}
+		if (!"0".equals(appUser.getFlag())) {
+			// 不成功
+			AppVo_1 vo = new AppVo_1();
+			vo.setA1(appUser.getFlag());
+			write(vo);
+		}else{
+			String sessionId = loginAndRegisterService.updateSessionIdByTel(telephone);
+			appUser.setSessionId(sessionId);
+			UserCache.setUser(appUser);
+			AppVo_13 vo = fillLoginSuccessResult(appUser);
+			write(vo);
+		}
+		
+		return null;
+	}
+
+	/**
+	 * 填充登陆成功后的返回结果
+	 * 
+	 * @param appUser
+	 *            app用户
+	 * @return
+	 */
+	private AppVo_13 fillLoginSuccessResult(PassengerInfo appUser) {
+		AppVo_13 vo = new AppVo_13();
+		vo.setA1(appUser.getFlag());
+		vo.setA2(appUser.getPassengerId()); // 用户ID
+		vo.setA3(appUser.getDisplayId()); // 回显ID
+		vo.setA4(appUser.getNickName()); // 昵称
+		vo.setA5(appUser.getSex()); // 性别
+		vo.setA6(appUser.getTelephone()); // 手机号码
+		String headerIp = PropertyManage.get("header.pic.ip");// IP地址
+		if (appUser.getHeaderPicUrl() != null && !"".equals(appUser.getHeaderPicUrl())) {
+			vo.setA7(headerIp + "/" + appUser.getHeaderPicUrl()); // 头像URL
+		}else{
+			vo.setA7("");
+		}
+		vo.setA8(appUser.getPassWord()); // 密码
+		vo.setA9(appUser.getRegisterTime()); // 注册时间
+		vo.setA10(appUser.getTwoCodeValue()); // 二维码唯一标识
+		vo.setA11(appUser.getTwoCodePicUrl()); // 二维码图片地址
+		// 登录成功，则添加im用户(如果登录用户不是im用户，则保存为im用户)
+		String imUserId = this.driverService.addImUser(
+				appUser.getPassengerId(), "1");// 保存乘客信息
+		vo.setA12(imUserId);
+		// 获取老拉新有奖推荐开关标识(推荐有奖开关：0.关 1.开)
+		AppVo_1 vo1 = recommendAwardService.getRecommendAwardSwitch();
+		if (null != vo1 && StringUtils.isNotEmpty(vo1.getA1())) {
+			vo.setA13(vo1.getA1());
+		}
+		return vo;
+	}
+
+	/**
+	 * 发送通用短信
+	 * 
+	 * @return
+	 */
+	@Action(value = "sendCommenMsg", results = { @Result(type = "json") })
+	public String sendCommenMsg() {
+		String tel = request.getParameter("tel");
+		
+		//防止重复发送
+		String key_time = "msgTimes_"+tel;
+		String cacheCode = CacheUtil.getCache(key_time);
+		if(cacheCode==null || "".equals(cacheCode)){
+			
+			String random = RandomStringUtils.randomNumeric(4);
+			CacheUtil.setCache(key_time, random, 80);//标识80秒内只发送一次
+			new Message("【小猪巴士】验证码为：%s，2分钟内有效，请勿泄露。", random).sendTo(tel);
+			CacheUtil.setCache(tel, random, 120);
+		}
+		
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1("1");
+		write(vo);
+		return null;
+	}
+	
+	/**
+	 * 根据ID获取用户信息（微信调用接口）
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "weiXinLogin", results = { @Result(type = "json") })
+	public String weiXinLogin() throws IOException {
+		String uid = request.getParameter("uid");// 用户ID或者微信openId
+		String type = request.getParameter("type");// ID类型 0：用户ID 1：openId;
+		PassengerInfo appUser = loginAndRegisterService.getPassengerByOpenId(uid, type);
+
+		AppVo_14 vo = new AppVo_14();
+		vo.setA1(appUser.getFlag());
+		vo.setA2(appUser.getPassengerId()); // 用户ID
+		vo.setA3(appUser.getDisplayId()); // 回显ID
+		vo.setA4(appUser.getNickName()); // 昵称
+		vo.setA5(appUser.getSex()); // 性别
+		vo.setA6(appUser.getTelephone()); // 手机号码
+		String headerIp = PropertyManage.get("header.pic.ip");// IP地址
+		if (appUser.getHeaderPicUrl() != null&& !"".equals(appUser.getHeaderPicUrl())) {
+			vo.setA7(headerIp + "/" + appUser.getHeaderPicUrl()); // 头像URL
+		}
+		vo.setA8(appUser.getPassWord()); // 密码
+		vo.setA9(appUser.getRegisterTime()); // 注册时间
+		vo.setA10(appUser.getTwoCodeValue()); // 二维码唯一标识
+		vo.setA11(appUser.getTwoCodePicUrl()); // 二维码图片地址
+		// 登录成功，则添加im用户(如果登录用户不是im用户，则保存为im用户)
+		if (appUser != null) {
+			String imUserId = this.driverService.addImUser(appUser.getPassengerId(), "1");// 保存乘客信息
+			vo.setA12(imUserId);
+		}
+		vo.setA13("0");
+		vo.setA14(appUser.getOpenId());
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 修改用户openid
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "updateOpenId", results = { @Result(type = "json") })
+	public String updateOpenId() throws IOException {
+		String openid = request.getParameter("openid");
+		String uid = request.getParameter("uid");
+		String result = loginAndRegisterService.updateOpenId(openid, uid);
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1(result);
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 修改用户信息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "updateUserInfo", results = { @Result(type = "json") })
+	public String updateUserInfo() throws IOException {
+		String passengerId = request.getParameter("passengerId");
+
+		if (passengerId == null || "".equals(passengerId)) {
+			User appUser = UserCache.getUser();// 当前登录用户信息
+			if (appUser != null) {
+				passengerId = appUser.getPassengerId();
+			}
+		}
+		String nickName = request.getParameter("nickName");
+		String headerPicUrl = request.getParameter("headerPicUrl");
+		if (null != headerPicUrl && !"".equals(headerPicUrl)) {
+			String headerIp = PropertyManage.get("header.pic.ip");// IP地址
+			headerPicUrl = headerPicUrl.replace(headerIp + "/", "");
+		}
+		String sex = request.getParameter("sex");
+		String result = loginAndRegisterService.updateUserInfo(passengerId,
+				nickName, headerPicUrl, sex);
+
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1(result); // 1：成功 其他：失败
+
+		if ("1".equals(result)) {
+			PassengerInfo newAppUser = loginAndRegisterService
+					.updateUserForSession(passengerId);
+			UserCache.setUser(newAppUser);
+		}
+		write(vo);
+		return null;
+	}
+
+
+	/**
+	 * 建议反馈
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "help", results = { @Result(type = "json") })
+	public String help() throws IOException {
+		String context = request.getParameter("context");// 内容
+		String phoneNo = request.getParameter("phoneNo");// 电话
+		String userid = "";
+		AppVo_1 vo = new AppVo_1();
+		String flag = "";
+		User appUser = UserCache.getUser();// 当前登录用户信息
+		if (appUser != null) {
+			userid = appUser.getPassengerId();
+			flag = loginAndRegisterService.help(Html.purge(context),
+					phoneNo, userid); // 1:成功
+			// 2：失败
+			vo.setA1(flag);
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 消息列表
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "msgList", results = { @Result(type = "json") })
+	public String msgList() throws IOException {
+		User appUser = UserCache.getUser();// 当前登录用户信息
+		String userid = "";// 用户ID
+		AppVo_1_list vo = new AppVo_1_list();
+		if (appUser != null) {
+			userid = appUser.getPassengerId();
+			vo.setA1("1");
+			List<AppVo_8> list = loginAndRegisterService.msgList(userid);
+			vo.setList(list);
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 消息详细
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "msgInfo", results = { @Result(type = "json") })
+	public String msgInfo() throws IOException {
+		String msgid = request.getParameter("msgId");// 消息ID
+		User appUser = UserCache.getUser();// 当前登录用户信息
+		AppVo_7 vo = new AppVo_7();
+		String userid = "";
+
+		if (appUser != null) {
+			userid = appUser.getPassengerId();
+			vo.setA1("1");
+			AppVo_5 msg = loginAndRegisterService.msgInfo(msgid, userid);
+			if (msg != null) {
+				vo.setA2(msg.getA1());// 时间
+				vo.setA3(msg.getA2());// 标题
+				vo.setA4(msg.getA3());// 正文
+				if (msg.getA4() == null) {
+					vo.setA5("");
+				} else {
+					vo.setA5(msg.getA4());// 图片
+				}
+				if (msg.getA5().equals("2")) {// 所属模块（1.小猪巴士 2.包车）
+					vo.setA6(PropertyManage.get("companyTel"));// 客服电话
+				}
+				vo.setA7(msg.getA5());
+			}
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 删除消息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "delMsg", results = { @Result(type = "json") })
+	public String delMsg() throws IOException {
+		String msgids = request.getParameter("msgIds");// 消息ID
+		User appUser = UserCache.getUser();// 当前登录用户信息
+		AppVo_1 vo = new AppVo_1();
+		String userid = "";
+
+		if (appUser != null) {
+			userid = appUser.getPassengerId();
+			String flag = loginAndRegisterService.delMsg(msgids, userid);
+			vo.setA1(flag);
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+
+	/**
+	 * 退出登录
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "loginOut", results = { @Result(type = "json") })
+	public String loginOut() throws IOException {
+		CookieUtil.removeCookie("sid");
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1("1");
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * app错误日志添加
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "addAppLog", results = { @Result(type = "json") })
+	public String addAppLog() throws IOException {
+		String memo = request.getParameter("memo");// 错误描述
+		ErrLog err = new ErrLog();
+		err.setIdType("1");
+		err.setDetail(memo);
+		err.setRectime(MyDate.Format.DATETIME.now());
+		String flag = loginAndRegisterService.addAppLog(err);
+
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1(flag);
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 获取版本号
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getVersion", results = { @Result(type = "json") })
+	public String getVersion() throws IOException {
+		String opic = PropertyManage.get("ftp.image.root.opic");
+		String root = PropertyManage.get("http.root.url");
+
+		AppVo_5 vo = loginAndRegisterService.getVersion();
+		String url = root + "/busonline/" + opic + "/" + vo.getA2();
+		vo.setA2(url);
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 保存用戶id映射
+	 * 
+	 * @return
+	 */
+	@Action(value = "saveUserIdMap", results = { @Result(type = "json") })
+	public void saveUserIdMap() {
+		AppVo_2 vo = new AppVo_2();
+		String passengerId = request.getParameter("passengerId");
+		if (StringUtils.isEmpty(passengerId)) {
+			write("passengerId is null");
+			return;
+		}
+		String clientId = request.getParameter("clientId");
+		if (StringUtils.isEmpty(clientId)) {
+			write("clientId is null");
+			return;
+		}
+		String channelId = request.getParameter("channelId");
+		if (StringUtils.isEmpty(channelId)) {
+			write("channelId is null");
+			return;
+		}
+		UserIdMap userIdMap = new UserIdMap();
+		userIdMap.setPassengerId(passengerId);
+		userIdMap.setClientId(clientId);
+		userIdMap.setChannelId(channelId);
+		try {
+			loginAndRegisterService.updateUserIdMap(userIdMap);
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+			write("other error");
+			return;
+		}
+	}
+
+	/**
+	 * 获取用户id映射
+	 */
+	@Action(value = "getUserIdMap", results = { @Result(type = "json") })
+	public void getUserIdMap() {
+		String channelId = request.getParameter("channelId");
+		String clientId = request.getParameter("clientId");
+		try {
+			UserIdMap userIdMap = loginAndRegisterService.getUserIdMap(
+					channelId, clientId);
+			if (userIdMap == null) {
+				write();
+				return;
+			}
+			write(userIdMap);
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+			write();
+			return;
+		}
+	}
+
+	/**
+	 * 获取IOS版本信息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getIOSVersion", results = { @Result(type = "json") })
+	public String getIOSVersion() throws IOException {
+		String appType = request.getParameter("appType");// 应用类型
+		AppVo_5 vo = loginAndRegisterService.getIOSVersion(appType);
+		// a1:版本号，a2:是否强制更新（0：否 1：是） a3:更新内容（“#”分隔）
+		write(vo);
+		return null;
+	}
+
+	public static String convert(String utfString) {
+		StringBuilder sb = new StringBuilder();
+		int i = -1;
+		int pos = 0;
+
+		while ((i = utfString.indexOf("\\u", pos)) != -1) {
+			sb.append(utfString.substring(pos, i));
+			if (i + 5 < utfString.length()) {
+				pos = i + 6;
+				sb.append((char) Integer.parseInt(utfString.substring(i + 2,
+						i + 6), 16));
+			}
+		}
+		sb.append(utfString.substring(pos));
+		return sb.toString();
+	}
+
+}

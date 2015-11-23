@@ -1,0 +1,328 @@
+package com.amwell.vo.app;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.amwell.commons.ApplicationContextHolder;
+import com.amwell.dao.IPublishLineDao;
+import com.amwell.job.AutoPutTicketTask;
+
+/**
+ * 线路_线路基本信息表
+ * @author zhangqiang
+ *
+ */
+@SuppressWarnings("all")
+public class LineBaseInfo implements java.io.Serializable {
+
+
+	private String lineBaseId; 			//基本线路ID
+	private String lineName;			//线路名称
+	private String lineTime;			//预计行程时间(分)
+	private String lineType;			//线路类型 0:招募 1:非招募
+	private String lineSubType;			//线路子类型 0:上下班 1:旅游
+	private String provinceCode;        //省份代码
+	private String cityCode;            //城市代码
+	private String cityName;            //城市名称
+	private String passengers;			//招募类型线路中设置的招募指标人数 非招募类型线路值空
+	private String displayFlag;			//置顶排序字段
+	private String lineStatus;			//线路类型：1（非招募） 0：待调度 1：调度中 2：待发布 3：已发布 4：已下线 5：删除 --->线路类型：0（招募） 0:招募前 1：招募中 2：关闭 3：删除
+	private String businessId;			//商户ID （指派给商户的ID）
+	private String orderPrice;			//价格(元/次)
+	private String originalPrice;       //原价(元/次)
+	private String originalFlag;        //原价生效开关(开true  关false null)
+	private String discountRate;		//折扣率
+	private String remark;				//备注
+	private String fixTimeFlag;			//（招募）固定时间Flag 0:固定时间 1：非固定时间
+	private String recruitFixTime;		//招募固定时间 12345 表示礼拜 1，2，3，4，5
+	private String recruitNoFixTime;	//招募非固定时间 例如2014年8月11号--->20140811
+	private String deadlineTime;		//招募报名截至日期
+	private String createBy;			//创建人
+	private String createOn;			//创建时间
+	private String updateBy;			//修改人
+	private String updateOn;			//修改时间
+	private String recruitStartTime;	//招募开始时间
+	private String lineKm;				//预计行程里程
+	
+	private String stationNames;        //站台集合，用“-”隔开
+	private String fromStation;			//起点站台
+	private String toStation;			//终点站台
+	private String pCount;				//已定人数（用于招募已报名人数）
+	private String isSign;				//是否报名（用于招募路线中当前用户是否报名）
+	private String stationInfoes;       //
+	private String stationInfoesMask;   //
+	private String fullStationInfoes;   //
+	private String fullStationInfoesMask; //
+	private String lineManager;         //线路运营人员ID
+	private String userName;            //线路运营人员名字
+	
+	private String autoPutTicket;      //是否自动放票 true-是 false－否
+	
+	// 配置线路是否放票/
+	public static void setAutoPutTicket(String lineBaseId,String autoPutTicket){
+		IPublishLineDao publishLineDao = ApplicationContextHolder.getBean(IPublishLineDao.class);
+		publishLineDao.setAutoPutTicket(lineBaseId, autoPutTicket);
+		// 触发一次放票
+		AutoPutTicketTask autoPutTicketTask = ApplicationContextHolder.getBean(AutoPutTicketTask.class);
+		autoPutTicketTask.autoPutTicket();
+	}
+	
+	public static List<LineBaseInfo> listAutoPutTicketLine(){
+		IPublishLineDao publishDao = ApplicationContextHolder.getBean(IPublishLineDao.class);
+		return publishDao.listAutoPutTicketLine();
+	}
+	
+	
+	
+	public String getIsSign() {
+		return isSign;
+	}
+	public void setIsSign(String isSign) {
+		this.isSign = isSign;
+	}
+	public String getRecruitStartTime() {
+		return recruitStartTime;
+	}
+	public void setRecruitStartTime(String recruitStartTime) {
+		this.recruitStartTime = recruitStartTime;
+	}
+	public String getLineKm() {
+		if(StringUtils.isEmpty(this.lineKm)){
+			this.lineKm = "0";
+		}
+		return lineKm;
+	}
+	public void setLineKm(String lineKm) {
+		this.lineKm = lineKm;
+	}
+	public String getpCount() {
+		return pCount;
+	}
+	public void setpCount(String pCount) {
+		this.pCount = pCount;
+	}
+	public String getFromStation() {
+		return fromStation;
+	}
+	public void setFromStation(String fromStation) {
+		this.fromStation = fromStation;
+	}
+	public String getToStation() {
+		return toStation;
+	}
+	public void setToStation(String toStation) {
+		this.toStation = toStation;
+	}
+	
+	
+	
+	public String getStationNames() {
+		return stationNames;
+	}
+	public void setStationNames(String stationNames) {
+		this.stationNames = stationNames;
+	}
+	public String getLineBaseId() {
+		return lineBaseId;
+	}
+	public void setLineBaseId(String lineBaseId) {
+		this.lineBaseId = lineBaseId;
+	}
+	public String getLineName() {
+		return lineName;
+	}
+	public void setLineName(String lineName) {
+		this.lineName = lineName;
+	}
+	public String getLineTime() {
+		return lineTime;
+	}
+	public void setLineTime(String lineTime) {
+		this.lineTime = lineTime;
+	}
+	public String getLineType() {
+		return lineType;
+	}
+	public void setLineType(String lineType) {
+		this.lineType = lineType;
+	}
+	public String getLineSubType() {
+		return lineSubType;
+	}
+	public void setLineSubType(String lineSubType) {
+		this.lineSubType = lineSubType;
+	}
+	public String getPassengers() {
+		return passengers;
+	}
+	public void setPassengers(String passengers) {
+		this.passengers = passengers;
+	}
+	public String getDisplayFlag() {
+		return displayFlag;
+	}
+	public void setDisplayFlag(String displayFlag) {
+		this.displayFlag = displayFlag;
+	}
+	public String getLineStatus() {
+		return lineStatus;
+	}
+	public void setLineStatus(String lineStatus) {
+		this.lineStatus = lineStatus;
+	}
+	public String getBusinessId() {
+		return businessId;
+	}
+	public void setBusinessId(String businessId) {
+		this.businessId = businessId;
+	}
+	public String getOrderPrice() {
+		return orderPrice;
+	}
+	public void setOrderPrice(String orderPrice) {
+		this.orderPrice = orderPrice;
+	}
+	public String getDiscountRate() {
+		return discountRate;
+	}
+	public void setDiscountRate(String discountRate) {
+		this.discountRate = discountRate;
+	}
+	public String getRemark() {
+		return remark;
+	}
+	public void setRemark(String remark) {
+		this.remark = remark;
+	}
+	public String getFixTimeFlag() {
+		return fixTimeFlag;
+	}
+	public void setFixTimeFlag(String fixTimeFlag) {
+		this.fixTimeFlag = fixTimeFlag;
+	}
+	public String getRecruitFixTime() {
+		return recruitFixTime;
+	}
+	public void setRecruitFixTime(String recruitFixTime) {
+		this.recruitFixTime = recruitFixTime;
+	}
+	public String getRecruitNoFixTime() {
+		return recruitNoFixTime;
+	}
+	public void setRecruitNoFixTime(String recruitNoFixTime) {
+		this.recruitNoFixTime = recruitNoFixTime;
+	}
+	public String getDeadlineTime() {
+		return deadlineTime;
+	}
+	public void setDeadlineTime(String deadlineTime) {
+		this.deadlineTime = deadlineTime;
+	}
+	public String getCreateBy() {
+		return createBy;
+	}
+	public void setCreateBy(String createBy) {
+		this.createBy = createBy;
+	}
+	public String getCreateOn() {
+		return createOn;
+	}
+	public void setCreateOn(String createOn) {
+		this.createOn = createOn;
+	}
+	public String getUpdateBy() {
+		return updateBy;
+	}
+	public void setUpdateBy(String updateBy) {
+		this.updateBy = updateBy;
+	}
+	public String getUpdateOn() {
+		return updateOn;
+	}
+	public void setUpdateOn(String updateOn) {
+		this.updateOn = updateOn;
+	}
+	public String getProvinceCode() {
+		return provinceCode;
+	}
+	public void setProvinceCode(String provinceCode) {
+		this.provinceCode = provinceCode;
+	}
+	public String getCityCode() {
+		return cityCode;
+	}
+	public void setCityCode(String cityCode) {
+		this.cityCode = cityCode;
+	}
+	public String getCityName() {
+		return cityName;
+	}
+	public void setCityName(String cityName) {
+		this.cityName = cityName;
+	}
+	public String getStationInfoes() {
+		return stationInfoes;
+	}
+	public void setStationInfoes(String stationInfoes) {
+		this.stationInfoes = stationInfoes;
+	}
+	public String getStationInfoesMask() {
+		return stationInfoesMask;
+	}
+	public void setStationInfoesMask(String stationInfoesMask) {
+		this.stationInfoesMask = stationInfoesMask;
+	}
+	public String getFullStationInfoes() {
+		return fullStationInfoes;
+	}
+	public void setFullStationInfoes(String fullStationInfoes) {
+		this.fullStationInfoes = fullStationInfoes;
+	}
+	public String getFullStationInfoesMask() {
+		return fullStationInfoesMask;
+	}
+	public void setFullStationInfoesMask(String fullStationInfoesMask) {
+		this.fullStationInfoesMask = fullStationInfoesMask;
+	}
+	public String getAutoPutTicket() {
+		return autoPutTicket;
+	}
+	public void setAutoPutTicket(String autoPutTicket) {
+		this.autoPutTicket = autoPutTicket;
+	}
+	public String getLineManager() {
+		return lineManager;
+	}
+	public void setLineManager(String lineManager) {
+		this.lineManager = lineManager;
+	}
+	public String getUserName() {
+		return userName;
+	}
+	public void setUserName(String userName) {
+		this.userName = userName;
+	}
+
+	public String getOriginalPrice() {
+		if(StringUtils.isEmpty(this.originalPrice)){
+			return null;
+		}
+		return originalPrice;
+	}
+
+	public void setOriginalPrice(String originalPrice) {
+		this.originalPrice = originalPrice;
+	}
+
+	public String getOriginalFlag() {
+		return originalFlag;
+	}
+
+	public void setOriginalFlag(String originalFlag) {
+		this.originalFlag = originalFlag;
+	}
+	
+
+	
+}

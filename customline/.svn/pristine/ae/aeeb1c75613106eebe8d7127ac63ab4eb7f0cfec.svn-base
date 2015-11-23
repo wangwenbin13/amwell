@@ -1,0 +1,18 @@
+#app_back_root
+app_back_root=http://192.168.9.6:10054/customline_app/
+
+#customline_root
+customline_root=http\://192.168.9.6\:10055/customline/
+
+# SMS
+pns.sms.send=http://192.168.9.6:10086/api/sms
+pns.sms.balance=http://192.168.9.6:10086/api/sms/balance
+
+#wechat_back_root
+wechat_back_root=http://weixin.pig84.cn/busOnline/
+
+#http pic url
+http.pic.ip=http://192.168.9.6:10053
+
+#image store path
+http.pic.path=/home/ftptest/apache-tomcat-6.0.43/webapps/busonline/

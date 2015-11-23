@@ -1,0 +1,41 @@
+package com.amwell.commons;
+
+import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.log4j.Logger;
+
+
+/**
+ * Short Message.
+ * 
+ * @author GuoLin
+ *
+ */
+public class Message {
+	
+	private static final Logger logger = Logger.getLogger(Message.class);
+	
+	private static final String URL_SEND = PropertyManage.getInfoProperty("pns.sms.send");
+
+	private static final String URL_BALANCE = PropertyManage.getInfoProperty("pns.sms.balance");
+	
+	private final String content;
+	
+	public Message(String content, Object... args) {
+		this.content = String.format(content, args);
+	}
+	
+	public void sendTo(String... mobiles) {
+		String mobileText = String.join(",", mobiles);
+		if (logger.isInfoEnabled()) {
+			logger.info("Sending message to " + mobileText + " : '" + content + "'");
+		}
+		PostHttpClient.post(URL_SEND, "content", content, "mobile", mobileText);  // We don't care whether message is successful
+
+	}
+
+	public static int balance() {
+		String res = HttpRequestUtils.sendGetRequest(URL_BALANCE);
+		return NumberUtils.toInt(res);
+	}
+	
+}

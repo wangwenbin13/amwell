@@ -1,0 +1,47 @@
+apply plugin:'war'
+apply plugin:'eclipse-wtp'
+
+repositories {
+    mavenCentral()
+}
+
+webAppDirName = 'WebRoot'
+sourceSets {
+   main {
+       java.srcDirs = ['src']
+       resources.srcDirs = ['src']
+   }
+}
+
+dependencies {
+    compile 'org.apache.struts:struts2-core:2.3.24'
+	compile 'org.apache.struts:struts2-spring-plugin:2.3.24'
+	compile 'org.apache.struts:struts2-convention-plugin:2.3.24'
+	compile 'org.apache.struts:struts2-json-plugin:2.3.24' 
+	
+    compile 'org.springframework:spring-web:4.0.3.RELEASE'
+    compile 'org.springframework:spring-tx:4.0.3.RELEASE'
+	
+    compile 'mysql:mysql-connector-java:5.1.36'
+	
+	compile 'commons-dbutils:commons-dbutils:1.6'
+	compile 'commons-dbcp:commons-dbcp:1.4'
+	compile 'commons-collections:commons-collections:3.2.1'
+	compile 'commons-httpclient:commons-httpclient:3.1'
+	compile 'commons-beanutils:commons-beanutils:1.8.0'
+	compile 'commons-lang:commons-lang:2.4'
+	compile 'org.apache.commons:commons-lang3:3.1'
+	
+	compile 'com.google.code.gson:gson:2.3.1'
+	compile 'log4j:log4j:1.2.17'
+	compile 'org.apache.poi:poi-ooxml:3.7'
+	compile 'javax.servlet:jstl:1.2'
+	compile 'net.sf.oval:oval:1.84'
+	
+    providedCompile 'javax.servlet:javax.servlet-api:3.0.1'
+    providedCompile fileTree(dir: "${webAppDirName}/WEB-INF/lib", include: '*.jar')
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}

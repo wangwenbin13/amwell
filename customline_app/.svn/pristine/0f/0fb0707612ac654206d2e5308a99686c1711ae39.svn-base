@@ -1,0 +1,161 @@
+package com.pig84.ab.action;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.pig84.ab.cache.UserCache;
+import com.pig84.ab.service.ICouponService;
+import com.pig84.ab.service.IGiftService;
+import com.pig84.ab.vo.User;
+import com.pig84.ab.vo.bean.AppVo_1_list;
+import com.pig84.ab.vo.bean.AppVo_2;
+import com.pig84.ab.vo.bean.AppVo_3;
+import com.pig84.ab.vo.bean.AppVo_3_list;
+import com.pig84.ab.vo.bean.AppVo_6;
+
+/**
+ * 优惠券相关
+ * @author 
+ *
+ */
+@ParentPackage("no-interceptor")
+@Namespace("/app_gif")
+@SuppressWarnings("all")
+@ExceptionMappings( { @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class GiftAction extends BaseAction {
+
+	@Autowired
+	private IGiftService giftLineService;
+	
+	@Autowired
+	private ICouponService couponService;
+	
+	/**
+	 * 查询待领取优惠券列表
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "getCouponList",results={@Result(type="json")})
+	public String getCouponList(){
+		User appUser = UserCache.getUser();//当前登录用户信息
+		AppVo_3_list vo=new AppVo_3_list();
+		if(null==appUser){
+			vo.setA1("0");//未登录
+		}
+		else{
+			vo.setA1("1");//已登录
+			
+			int pageSize = 5;//每页显示条数
+			if(!(null==request.getParameter("pageSize")||""==request.getParameter("pageSize"))){
+				pageSize = Integer.parseInt(request.getParameter("pageSize"));
+			}
+			int currentPage = 0;//当前页数
+			if(!(null==request.getParameter("currentPage")||"".equals(request.getParameter("currentPage")))){
+				currentPage=Integer.parseInt(request.getParameter("currentPage"));
+			}
+			
+			String passengerId=appUser.getPassengerId();// 登录用户id
+			String telephone=appUser.getTelephone();// 登录用户电话号码
+			
+			String couponType=request.getParameter("couponType");//推广位置 1:APP渠道 2:微信渠道
+
+			AppVo_1_list vl=giftLineService.saveSysGiftInfo(passengerId, telephone, couponType,pageSize,currentPage);
+			if(null!=vl){
+				vo.setA3(vl.getA1());
+				vo.setList(vl.getList());
+			}
+		}
+			write(vo);
+		return null;
+	}
+	
+	/**
+	 * 查询未使用的优惠券列表
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "getMyCouponList",results={@Result(type="json")})
+	public String getMyCouponList(){
+		
+		int pageSize = 5;//每页显示条数
+		if(!(null==request.getParameter("pageSize")||""==request.getParameter("pageSize"))){
+			pageSize = Integer.parseInt(request.getParameter("pageSize"));
+		}
+		int currentPage = 0;//当前页数
+		if(!(null==request.getParameter("currentPage")||"".equals(request.getParameter("currentPage")))){
+			currentPage=Integer.parseInt(request.getParameter("currentPage"));
+		}
+		String couponType=request.getParameter("couponType");//推广位置 1:APP渠道 2:微信渠道
+		
+		String uid = request.getParameter("uid");//微信端传过来的用户id
+		
+		AppVo_1_list vo=new AppVo_1_list();
+		List<AppVo_6> list=null;
+		
+		if(StringUtils.isNotBlank(uid)){
+//			list=giftLineService.updateGiftStatus(uid,null, couponType,pageSize,currentPage);
+			list=couponService.getCoupon(uid, null, pageSize, currentPage);
+		}
+		else{
+			User appUser = UserCache.getUser();//当前登录用户信息
+			if(null==appUser){
+				vo.setA1("0");//未登录
+			}
+			else{
+				vo.setA1("1");//已登录
+				String telephone=appUser.getTelephone();// 登录用户电话号码
+//				list=giftLineService.updateGiftStatus(null,telephone, couponType,pageSize,currentPage);
+				list=couponService.getCoupon(null, telephone, pageSize, currentPage);
+			}
+		}
+		
+		if(null==list||list.size()==0){
+			list=new ArrayList<AppVo_6>();
+		}
+		vo.setList(list);
+		
+		write(vo);
+		return null;
+	}
+	
+	/**
+	 * 领取优惠券
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "saveCouponPassenger",results={@Result(type="json")})
+	public String saveCouponPassenger(){
+		User appUser = UserCache.getUser();//当前登录用户信息
+		AppVo_3 vo=new AppVo_3();
+		if(null==appUser){
+			vo.setA1("0");//未登录
+		}
+		else{
+			vo.setA1("1");//已登录
+			
+			String passengerId=appUser.getPassengerId();// 登录用户id
+			String telephone=appUser.getTelephone();// 登录用户电话号码
+			String couponGiftId=request.getParameter("couponGiftId");//优惠券礼品中间表id
+
+			synchronized (GiftAction.class) {//添加同步锁
+				AppVo_2 vo2 = giftLineService.saveCouponPassenger(passengerId,telephone,couponGiftId);
+				if(null!=vo2){
+					vo.setA2(vo2.getA1());
+					vo.setA3(vo2.getA2());
+				}
+			}
+		}
+		write(vo);
+		return null;
+	}
+}

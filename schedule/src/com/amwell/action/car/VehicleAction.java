@@ -1,0 +1,610 @@
+package com.amwell.action.car;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+import org.apache.struts2.ServletActionContext;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.amwell.action.BaseAction;
+import com.amwell.commons.JSONUtil;
+import com.amwell.commons.MyDate;
+import com.amwell.commons.PropertyManage;
+import com.amwell.commons.StringUtil;
+import com.amwell.entity.Page;
+import com.amwell.entity.Search;
+import com.amwell.service.ILineService;
+import com.amwell.service.IVehicleInfoService;
+import com.amwell.utils.export.ExcelUtils;
+import com.amwell.utils.export.JsGridReportBase;
+import com.amwell.utils.export.TableData;
+import com.amwell.vo.DriverClassScheduleVo;
+import com.amwell.vo.DriverSchedulePageVo;
+import com.amwell.vo.DriverScheduleVo;
+import com.amwell.vo.LineClassEntity;
+import com.amwell.vo.LineClassVo;
+import com.amwell.vo.VehicleInfoEntity;
+
+/**
+ * 调度平台-车辆管理
+ * 
+ * @author 龚雪婷
+ *
+ */
+@ParentPackage("user-finit")
+@Namespace("/dispatchVehicle")
+@SuppressWarnings("all")
+@ExceptionMappings({ @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class VehicleAction extends BaseAction {
+
+	private Logger logger = Logger.getLogger(VehicleAction.class);
+
+	// 车辆service
+	@Autowired
+	private IVehicleInfoService vehicleInfoService;
+
+	@Autowired
+	private ILineService lineService;
+
+	// 车辆对象
+	private VehicleInfoEntity vehicleInfoEntity;
+
+	private String vehicleId;// 车辆id
+
+	/**
+	 * 记录数的下标记数，0开始，到10
+	 */
+	private Integer currentPage = 0;
+
+	/**
+	 * 显示字段 0:默认进来的 1:点击搜索的
+	 */
+	private Integer searchOrNo = 0;
+
+	/**
+	 * 加载车辆列表
+	 */
+	@Action(value = "vehicleInfoList", results = { @Result(name = "success", location = "../../view/car/carList.jsp") })
+	public String list() {
+		try {
+			if (request.getParameter("p") == null) {// 第一次访问该列表时清空session中的查询条件信息
+				session.remove("vehicleInfoList_Cond");
+			}
+			currentPage = StringUtil.objectToInt(
+					request.getParameter("currentPage") != null ? request.getParameter("currentPage") : "0");
+			/* 将条件存到session,便于刷新后任然存在页面而不会丢失 */
+			search = (Search) (search == null ? session.get("vehicleInfoList_Cond") : search);
+			session.put("vehicleInfoList_Cond", search);
+			int pageSize = 10;
+			if (null == search) {
+				search = new Search();
+			}
+			search.setField06(this.getSessionUser().getBusinessId());// 传入登录商户id为条件
+			map = vehicleInfoService.listByPage(search, currentPage, pageSize);
+			list = (List) map.get("list");// 数据对象
+			page = (Page) map.get("page");// 分页对象
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+		}
+		return SUCCESS;
+	}
+
+	/**
+	 * 查看车辆详情
+	 * 
+	 * @return
+	 */
+	@Action(value = "vehicleInfoDetail", results = {
+			@Result(name = "success", location = "../../view/car/carDetail.jsp") })
+	public String detail() {
+		try {
+			String vehicleId = request.getParameter("vehicleId");
+			vehicleInfoEntity = vehicleInfoService.getVehicleById(vehicleId);
+			if (null != vehicleInfoEntity) {
+				if (StringUtils.isNotBlank(vehicleInfoEntity.getVehicleUrl())) {
+					// 获取车辆图片的全路径
+					String httpIp = PropertyManage.getInfoProperty("http.pic.ip");// IP地址
+					vehicleInfoEntity.setVehicleUrl(httpIp + vehicleInfoEntity.getVehicleUrl());
+				}
+			}
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+		}
+		return SUCCESS;
+	}
+
+	/**
+	 * 根据时间段显示车辆排班信息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getCarScheduleList", results = { @Result(type = "json") })
+	public String getCarScheduleList() throws IOException {
+		String json = "[]";
+		String vehicleId = super.request.getParameter("vehicleId");
+		String beginOrderDate = super.request.getParameter("beginOrderDate");
+		String endOrderDate = super.request.getParameter("endOrderDate");
+		String pageSizeStr = super.request.getParameter("pageSize");
+		String currPageStr = super.request.getParameter("currPage");
+		String totalCountStr = super.request.getParameter("totalCount");
+		int pageSize = 7;
+		if (StringUtils.isNotBlank(pageSizeStr)) {
+			pageSize = Integer.parseInt(pageSizeStr);
+		}
+		int currPage = 0;
+		if (StringUtils.isNotBlank(currPageStr)) {
+			currPage = Integer.parseInt(currPageStr) - 1;
+		}
+		int totalCount = 0;
+		if (StringUtils.isNotBlank(totalCountStr)) {
+			totalCount = Integer.parseInt(totalCountStr);
+		}
+		search = new Search();
+		search.setField01(beginOrderDate);
+		search.setField02(endOrderDate);
+		map = vehicleInfoService.lineClassPage(search, vehicleId, currPage, pageSize);
+		list = (List) map.get("list");// 数据对象
+		page = (Page) map.get("page");// 分页对象
+		currPage = currPage + 1;
+		totalCount = page.getTotalCount();
+		List<DriverScheduleVo> driverScheduleList = new ArrayList<DriverScheduleVo>();
+		LineClassVo vo = null;
+		List<String> l = new ArrayList<String>();
+		if (!(null == list || list.size() == 0)) {
+			Iterator<LineClassVo> it = list.iterator();
+			while (it.hasNext()) {
+				vo = it.next();
+				if (!l.contains(vo.getOrderDate())) {
+					l.add(vo.getOrderDate());
+				}
+			}
+		}
+		DriverScheduleVo v = null;
+		List<DriverClassScheduleVo> scheduleList = null;
+		DriverClassScheduleVo d1 = null;
+		for (String s : l) {
+			v = new DriverScheduleVo();
+			v.setOrderDate(s);
+			scheduleList = new ArrayList<DriverClassScheduleVo>();
+			for (Object o : list) {
+				vo = (LineClassVo) o;
+				if (vo.getOrderDate().equals(s)) {
+					if (StringUtils.isNotBlank(vo.getLineBaseId())) {
+						String name = this.lineService.getStartAndEndname(vo.getLineBaseId());
+						if (StringUtils.isNotBlank(name)) {
+							String[] sn = name.split(",");
+							d1 = new DriverClassScheduleVo();
+							d1.setEndname(sn[1]);
+							d1.setLineClassId(null);
+							d1.setLineSubType(vo.getLineSubType());
+							int theTime = vo.getLineTime();
+							String timeStr = null;
+							if (theTime < 60) {
+								timeStr = theTime + "分钟";
+							}
+							if (theTime >= 60) {
+								timeStr = theTime / 60 + "小时";
+								if (theTime % 60 > 0) {
+									timeStr = timeStr + theTime % 60 + "分钟";
+								}
+							}
+							d1.setLineTime(timeStr);
+							d1.setOrderDate(vo.getOrderDate());
+							d1.setOrderStartTime(vo.getOrderStartTime());
+							d1.setStartname(sn[0]);
+							scheduleList.add(d1);
+						}
+					}
+				}
+			}
+			v.setScheduleList(scheduleList);
+			driverScheduleList.add(v);
+		}
+		DriverSchedulePageVo thePage = new DriverSchedulePageVo();
+		thePage.setPageSize(pageSize);
+		thePage.setTotalCount(totalCount);
+		thePage.setCurrPage(currPage);
+		thePage.setResultDate(driverScheduleList);
+		json = JSONUtil.formObjectToJSONStr(thePage);
+		// 去掉前后的[]，以保证页面能正常使用json数据
+		//json = json.substring(1, json.length() - 1);
+		getResponse().setContentType("text/html;charset=UTF-8");
+		getResponse().getWriter().print(json);
+		return null;
+	}
+
+	/**
+	 * 根据车辆id导出班次信息
+	 * 
+	 * @return
+	 */
+	@Action(value = "exportCarScheduleList")
+	public void exportCarScheduleList() {
+		try {
+			String vehicleId = super.request.getParameter("vehicleId");
+			String beginOrderDate = super.request.getParameter("beginOrderDate");
+			String endOrderDate = super.request.getParameter("endOrderDate");
+			search = new Search();
+			search.setField01(beginOrderDate);
+			search.setField02(endOrderDate);
+			map = vehicleInfoService.lineClass(search, vehicleId);
+			list = (List) map.get("list");// 数据对象
+			String title = ""; // 导出列表头名称
+			String[] hearders = {};
+			String[] fields = {};
+			title = "班次信息";
+			hearders = new String[] { "日期", "发车时间", "类型", "线路", "车牌号", "预计时间" };// 表头数组
+			fields = new String[] { "orderDate", "orderStartTime", "lineSubTypeS", "lineName", "vehicleNumber",
+					"lineTimeStr" };// 对象属性数组
+			// 转换类型
+			if (null != list && !list.isEmpty()) {
+				for (int i = 0; i < list.size(); i++) {
+					LineClassVo lineClassVo = (LineClassVo) list.get(i);
+					lineClassVo.setLineSubTypeS(lineClassVo.getLineSubType() == 0 ? "上下班" : "旅游");
+					int theTime = lineClassVo.getLineTime();
+					String timeStr = null;
+					if (theTime < 60) {
+						timeStr = theTime + "分钟";
+					}
+					if (theTime >= 60) {
+						timeStr = theTime / 60 + "小时";
+						if (theTime % 60 > 0) {
+							timeStr = timeStr + theTime % 60 + "分钟";
+						}
+					}
+					lineClassVo.setLineTimeStr(timeStr);
+				}
+			}
+			TableData td = ExcelUtils.createTableData(list, ExcelUtils.createTableHeader(hearders), fields);
+			JsGridReportBase report = new JsGridReportBase(request, getResponse());
+			String agent = request.getHeader("User-Agent");
+			report.exportToExcel(title, td, agent);
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * 查询车辆是否和班次关联
+	 * 
+	 * @return
+	 */
+	@Action(value = "searchBeforeDel", results = { @Result(type = "json") })
+	public String searchBeforeDel() {
+		try {
+			String returnStr = "-1";
+			String vehicleId = request.getParameter("vehicleId");
+			if (StringUtils.isNotBlank(vehicleId)) {
+				List<LineClassEntity> list = this.vehicleInfoService.getLineClassByVehicleId(vehicleId);
+				if (!(null == list || list.size() == 0)) {
+					String str = "";
+					for (LineClassEntity lce : list) {
+						str = lce.getOrderStartTime() + "、" + str;
+					}
+					returnStr = "车辆" + str.substring(0, str.length() - 1) + "已被调度排班，确定要删除车辆吗？";
+				}
+			}
+			HttpServletResponse response = ServletActionContext.getResponse();
+			response.setCharacterEncoding("utf-8");
+			response.getWriter().write(returnStr);
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+		}
+		return null;
+	}
+
+	/**
+	 * 单个或多个车辆删除
+	 * 
+	 * @return
+	 */
+	@Action(value = "vehicleInfoDelete", results = { @Result(type = "json") })
+	public String delete() {
+		try {
+			String returnStr = null;
+			String vehicleId = request.getParameter("vehicleId");
+			if (StringUtils.isBlank(vehicleId)) {
+				returnStr = "信息丢失，请刷新列表重新操作！";
+			} else {
+				int delFlag = vehicleInfoService.deleteVehicleById(vehicleId, this.getSessionUser().getUserId());
+				if (delFlag > 0) {
+					returnStr = "ok";
+				} else {
+					returnStr = "删除失败，请刷新列表重新操作！";
+				}
+			}
+			HttpServletResponse response = ServletActionContext.getResponse();
+			response.setCharacterEncoding("utf-8");
+			response.getWriter().write(returnStr);
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+		}
+		return null;
+	}
+
+	/**
+	 * 进入编辑页面
+	 * 
+	 * @return `
+	 */
+	@Action(value = "toVehicleEditPage", results = {
+			@Result(name = "success", location = "../../view/car/carAdd.jsp") })
+	public String toEditPage() {
+		try {
+			String vehicleId = request.getParameter("vehicleId");
+			if (StringUtils.isNotBlank(vehicleId)) {
+				vehicleInfoEntity = vehicleInfoService.getVehicleById(vehicleId);
+				if (null != vehicleInfoEntity) {
+					if (StringUtils.isNotBlank(vehicleInfoEntity.getVehicleUrl())) {
+						// 获取车辆全路径
+						String httpIp = PropertyManage.getInfoProperty("http.pic.ip");// IP地址
+						request.setAttribute("fullImgUrl", httpIp + vehicleInfoEntity.getVehicleUrl());
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+		}
+		return SUCCESS;
+	}
+
+	/**
+	 * 保存车辆信息
+	 * 
+	 * @return
+	 */
+	@Action(value = "vehicleInfoSave", results = { @Result(type = "json") })
+	public String save() throws Exception {
+		String resultStr = null;
+		String requestType = request.getParameter("requestType");
+		if (!"page".equals(requestType)) {// 如果不是来自页面的请求，则需要做数据验证，并进行中文转码
+			if (null == vehicleInfoEntity) {
+				resultStr = "请进入添加页面进行添加操作";
+			} else {
+				if (StringUtils.isBlank(vehicleInfoEntity.getVehicleNumber())) {
+					resultStr = "车牌号码不能为空，请进入添加页面重新输入";
+				}
+				if (null == resultStr && StringUtils.isBlank(vehicleInfoEntity.getVehicleBrand())) {
+					resultStr = "车辆品牌不能为空，请进入添加页面重新输入";
+				}
+				if (null == resultStr && StringUtils.isBlank(vehicleInfoEntity.getVehicleModel())) {
+					resultStr = "车型不能为空，请进入添加页面重新输入";
+				}
+				if (null == resultStr
+						&& (null == vehicleInfoEntity.getVehicleSeats() || 0 == vehicleInfoEntity.getVehicleSeats())) {
+					resultStr = "座位数量不能为空或零，请进入添加页面重新输入";
+				}
+				if (null == resultStr && null == vehicleInfoEntity.getVehicleType()) {
+					resultStr = "车辆类型不能为空，请进入添加页面重新输入";
+				}
+				if (null == resultStr) {
+					resultStr = convertEncoding(vehicleInfoEntity);
+				}
+			}
+		}
+		if (null == resultStr) {
+			if (StringUtils.isNotBlank(vehicleInfoEntity.getVehicleNumber())) {
+				// 根据车牌号查询车辆信息
+				List<VehicleInfoEntity> vehicleList = this.vehicleInfoService
+						.getVehicleByNumber(vehicleInfoEntity.getVehicleNumber().trim());
+				if (null == vehicleList || vehicleList.size() == 0) {
+					resultStr = "0";// 车牌号不存在
+				} else {
+					if ((StringUtils.isBlank(vehicleInfoEntity.getVehicleId()) && vehicleList.size() > 0)
+							|| (StringUtils.isNotBlank(vehicleInfoEntity.getVehicleId())
+									&& (!vehicleList.get(0).getVehicleId().equals(vehicleInfoEntity.getVehicleId())))) {
+						resultStr = "1=车牌号已经存在";// 车牌号已经存在
+					} else {
+						resultStr = "0";// 车牌号不存在
+					}
+				}
+			}
+			if (resultStr == "0") {
+				boolean flagType = false;
+				if (StringUtils.isBlank(vehicleInfoEntity.getVehicleId())) {
+					flagType = true;
+					vehicleInfoEntity.setBusinessId(this.getSessionUser().getBusinessId());// ************获取登录用户id
+					vehicleInfoEntity.setCreateBy(this.getSessionUser().getUserId());
+					vehicleInfoEntity.setCreateOn(MyDate.getMyDateLong());
+					vehicleInfoEntity.setDelFlag(new Short("0"));// 正常用户
+				} else {
+					vehicleInfoEntity.setUpdateBy(this.getSessionUser().getUserId());
+					vehicleInfoEntity.setUpdateOn(MyDate.getMyDateLong());
+				}
+				int flag = vehicleInfoService.saveOrUpdateVehicle(vehicleInfoEntity, this.getSessionUser().getUserId());
+				if (flagType) {// 添加车辆
+					if (flag > 0) {
+						resultStr = "2=添加车辆成功";// 添加车辆成功
+					} else {
+						resultStr = "3=添加车辆失败";// 添加车辆失败
+					}
+				} else {// 修改司机
+					if (flag > 0) {
+						resultStr = "4=修改车辆成功";// 修改车辆成功
+					} else {
+						resultStr = "5=修改车辆失败";// 修改车辆失败
+					}
+				}
+			}
+		}
+		HttpServletResponse response = getResponse();
+		response.setContentType("text/html;charset=GBK");
+		PrintWriter pw = response.getWriter();
+		pw.print(resultStr);
+		return null;
+	}
+
+	/**
+	 * @param regex
+	 *            正则表达式字符串
+	 * @param str
+	 *            要匹配的字符串
+	 * @return 如果str 符合 regex的正则表达式格式,返回true, 否则返回 false;
+	 */
+	private boolean match(String regex, String str) {
+		Pattern pattern = Pattern.compile(regex);
+		Matcher matcher = pattern.matcher(str);
+		return matcher.matches();
+	}
+
+	private String convertEncoding(VehicleInfoEntity vehicleInfoEntity) throws Exception {
+		// 取出客户提交的参数集
+		Enumeration<String> paramNames = request.getParameterNames();
+		// 遍历参数集取出每个参数的名称及值
+		while (paramNames.hasMoreElements()) {
+			String name = paramNames.nextElement();// 取出参数名称
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleId")) {// 车辆ID
+				String[] values = request.getParameterValues(name); // 根据参数名称取出其值
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					vehicleInfoEntity.setVehicleId(new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8"));
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleNumber")) {// 车牌号
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String reg = "(^[\\u4e00-\\u9fa5]{1}[A-Z]{1}[A-Z_0-9]{5}$)|(^[\\u4e00-\\u9fa5]{1}[A-Z]{1}(\\.|-){1}[A-Z_0-9]{5}$)|(^[\\u4e00-\\u9fa5]{1}[A]{1}(\\.|-)[V]{1}[A-Z_0-9]{4}$)|(^[A-Z]{2}[A-Z0-9]{2}[A-Z0-9\\u4e00-\\u9fa5]{1}[A-Z0-9]{4}$)|(^[\\u4e00-\\u9fa5]{1}[A-Z0-9]{5}[挂学警军港澳]{1}$)|(^[A-Z]{2}[0-9]{5}$)|(^(08|38){1}[A-Z0-9]{4}[A-Z0-9挂学警军港澳]{1}$)";
+					String vehicleNumber = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					if (match(reg, vehicleNumber)) {
+						vehicleInfoEntity.setVehicleNumber(vehicleNumber);
+					} else {
+						return "请输入正确的车牌号";
+					}
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleNo")) {// 车辆编号
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String vehicleNo = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					if (vehicleNo.length() <= 12) {
+						vehicleInfoEntity.setVehicleNo(vehicleNo);
+					} else {
+						return "车辆编号长度不能超过12";
+					}
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleBrand")) {// 品牌
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String vehicleBrand = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					if (vehicleBrand.length() <= 32) {
+						vehicleInfoEntity.setVehicleBrand(vehicleBrand);
+					} else {
+						return "车辆品牌长度不能超过32";
+					}
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleDepart")) {// 车系
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String vehicleDepart = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					if (vehicleDepart.length() <= 32) {
+						vehicleInfoEntity.setVehicleDepart(vehicleDepart);
+					} else {
+						return "车系长度不能超过32";
+					}
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleModel")) {// 车型
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String vehicleModel = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					if (vehicleModel.length() <= 32) {
+						vehicleInfoEntity.setVehicleModel(vehicleModel);
+					} else {
+						return "车型长度不能超过32";
+					}
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleColor")) {// 颜色
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String vehicleColor = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					if (vehicleColor.length() <= 8) {
+						vehicleInfoEntity.setVehicleColor(vehicleColor);
+					} else {
+						return "车颜色长度不能超过8";
+					}
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleBuyTime")) {// 购买日期
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String vehicleBuyTime = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					if (vehicleBuyTime.length() <= 64) {
+						vehicleInfoEntity.setVehicleBuyTime(vehicleBuyTime);
+					} else {
+						return "购买日期长度不能超过64";
+					}
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.remark")) {// 备注
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String remark = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					vehicleInfoEntity.setRemark(remark);
+				}
+			}
+			if (StringUtils.isNotBlank(name) && name.equals("vehicleInfoEntity.vehicleUrl")) {// 车辆图片URL
+				String[] values = request.getParameterValues(name);
+				if (!(null == values || values.length == 0 || StringUtils.isBlank(values[0]))) {
+					String vehicleUrl = new String(values[0].trim().getBytes("iso-8859-1"), "UTF-8");
+					if (vehicleUrl.length() <= 256) {
+						vehicleInfoEntity.setVehicleUrl(vehicleUrl);
+					} else {
+						return "车辆图片URL长度不能超过256";
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	public VehicleInfoEntity getVehicleInfoEntity() {
+		return vehicleInfoEntity;
+	}
+
+	public void setVehicleInfoEntity(VehicleInfoEntity vehicleInfoEntity) {
+		this.vehicleInfoEntity = vehicleInfoEntity;
+	}
+
+	public String getVehicleId() {
+		return vehicleId;
+	}
+
+	public void setVehicleId(String vehicleId) {
+		this.vehicleId = vehicleId;
+	}
+
+	public Integer getCurrentPage() {
+		return currentPage;
+	}
+
+	public void setCurrentPage(Integer currentPage) {
+		this.currentPage = currentPage;
+	}
+
+	public Integer getSearchOrNo() {
+		return searchOrNo;
+	}
+
+	public void setSearchOrNo(Integer searchOrNo) {
+		this.searchOrNo = searchOrNo;
+	}
+}

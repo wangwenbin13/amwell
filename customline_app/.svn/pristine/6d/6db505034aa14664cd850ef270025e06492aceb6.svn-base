@@ -1,0 +1,27 @@
+package com.pig84.ab.vo.coupon;
+
+import java.util.List;
+import com.pig84.ab.dao.ICouponRuleDao;
+import com.pig84.ab.vo.PassengerInfo;
+import com.pig84.ab.vo.bean.AppVo_1;
+
+/**
+ * 购票时间规则
+ * @author gxt
+ *
+ */
+public class TicketTimeRule extends Rule {
+	
+	private ICouponRuleDao couponRuleDao;
+
+	public TicketTimeRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public List<PassengerInfo> filter(Object obj,List<PassengerInfo> passengers) {
+		this.couponRuleDao=(ICouponRuleDao)obj;
+		List<AppVo_1> voList=couponRuleDao.getTicketPassenger(passengers.get(0).getPassengerId(),getTheValue(),getTheCondition());
+		return getResult(voList, passengers);
+	}
+}

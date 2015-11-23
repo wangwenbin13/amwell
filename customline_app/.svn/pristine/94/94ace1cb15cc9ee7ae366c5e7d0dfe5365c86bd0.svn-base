@@ -1,0 +1,23 @@
+package com.pig84.ab.vo.coupon;
+
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * 性别规则
+ * @author gxt
+ *
+ */
+public class SexRule extends Rule {
+
+	public SexRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public PassengerInfo filter(Object obj,PassengerInfo passenger){
+		if(null!=passenger.getSex()&&getTheValue().equals(passenger.getSex().toString())){//规则中的性别与用户性别相匹配
+			return passenger;
+		}
+		return null;
+	}
+}

@@ -1,0 +1,56 @@
+#coupon grant ExecutorService poolSize
+executorPoolSize=10
+
+#Order Check Url
+ORDER_INFO_URL = http://192.168.9.84:8080/customline_app/app_pay/getOrderInfo.action
+
+#Ali Pay Return Url
+Ali_Pay_Return_Url = http://192.168.9.84:8080/customline_pay/ali_pay/aliReturnUrl.action
+
+#Notice Merchant Url
+Notice_Merchant_Url = http://192.168.9.84:8080/customline_app/app_pay/merchantNotice.action
+
+
+#PayPal Url Conform
+paypal.conform=https\://www.sandbox.paypal.com/cgi-bin/webscr
+
+
+#httpclient config
+httpclient.pool.max=200
+httpclient.pool.maxPerHost=100
+httpclient.pool.timeout=10000
+httpclient.connect.timeout=5000
+httpclient.connect.socket.timeout=5000
+
+#weixin info
+weixin.app.id=wx00a756acf10b9960
+weixin.app.secret=3d6dc7b1cf3ef22fdd640b40960ce320
+weixin.app.key=5EUeZW3NHCEDY9YquU2r68HD44y5yMo9YztOexhGWLLBxtJZjdtIPYrH2FTmZxPgdu7WchOXfGkOxoTEyd7edyD2QwlTNLpHESBeOuvqFrjXZovpTBqVWrP9HsA8NdPC
+weixin.app.partner=1225903501
+weixin.app.partner.key=6b0030d786927ae4add0fe300c3f5551
+weixin.app.tokenurl=https://api.weixin.qq.com/cgi-bin/token
+weixin.app.grant.type=client_credential
+weixin.app.expire.errcode=42001
+weixin.app.fail.errcode=40001
+weixin.app.gateurl=https://api.weixin.qq.com/pay/genprepay?access_token=
+weixin.app.access.token=access_token
+weixin.app.errorcode=errcode
+weixin.app.sign.method=sha1
+#weixin zhengshu  9.11 D:/apiclient_cert.p12   ceshi /home/certs/apiclient_cert.p12  
+weixin.zhengshu=/home/certs/apiclient_cert.p12
+
+#weixin_pay_return_url
+weixin.app.return.url = http://192.168.9.84:8080/customline_pay/weixin_pay/WeiXinReturnUrl.action
+
+#xiaozhubus
+weixin.app.notify.weixin.url=http://183.57.43.186:39270/customline_app/app_pay/monitorWeiXinPayResult_pay.action
+#baoche
+weixin.app.notify.weixin.bc.url=http://183.57.43.186:39270/customline_app/app_pay/monitorWeiXinPayResultBc_pay.action
+
+#weixin return
+weixin.app.returnurl=https\://api.mch.weixin.qq.com/secapi/pay/refund
+
+#new weixin notify shangxiaban xianwang
+new.weixin.app.notify.shangxiaban.url=http://183.57.43.186:39270/customline_app/app_weixinReturn/monitorWeiXinPayResult_payNew.action
+#new weixin notify baoche xianwang
+new.weixin.app.notifu.baoche.url=http\://183.57.43.186\:39270/customline_app/app_weixinReturn/monitorWeiXinPayResultBc_payNew.action

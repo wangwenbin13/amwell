@@ -1,0 +1,55 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP PROCEDURE IF EXISTS `p_bc_order_changeStatus`$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `p_bc_order_changeStatus`()
+BEGIN
+	
+	-- 包车方式，1：单趟 2:往返 3:包天
+	DECLARE v_charteredMode VARCHAR(50);
+	
+	-- 发车时间 时间格式 2014-11-02 19:00
+	DECLARE v_startTime VARCHAR(50);
+	
+	-- 返程时间，对于单趟包车方式，此字段为空 时间格式 2014-11-02 19:00
+	DECLARE v_returnTime VARCHAR(50);
+	
+	-- 订单id
+	DECLARE v_orderId VARCHAR(50);
+	
+	-- 定义游标结束标识
+	DECLARE STOP INT DEFAULT 0;
+	
+	DECLARE cur CURSOR FOR (SELECT bl.charteredMode,CONCAT(LEFT(bl.startTime,10),' ','23:59:59'),CONCAT(LEFT(bl.returnTime,10),' ','23:59:59'),bo.orderId FROM bc_order bo,bc_line bl WHERE bo.bc_line_id = bl.bc_line_id AND bo.orderStatus IN(1,2));-- 订单状态,1:待调度 2：已调度(同时输入司机、车辆) 3：已完成 4:已退票
+	
+	-- 声明游标的异常处理，设置一个终止标记 
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP = 1; 
+	
+	-- 打开游标
+	OPEN cur;
+	
+	FETCH cur INTO v_charteredMode,v_startTime,v_returnTime,v_orderId;
+		
+         WHILE STOP <> 1 DO
+		
+		-- 单程的当天晚上十二点修改，有返程的或包日按返程时间当天晚上十二点修改，订单状态改为“已完成”
+		IF ((v_charteredMode = '1') AND (UNIX_TIMESTAMP(NOW()) >= UNIX_TIMESTAMP(v_startTime))) OR ((v_charteredMode <> '1') AND (UNIX_TIMESTAMP(NOW()) >= UNIX_TIMESTAMP(v_returnTime))) THEN 
+			
+			UPDATE bc_order SET orderStatus = '3' WHERE orderId = v_orderId;
+				
+		END IF;
+             
+              -- 获取下一行数据。
+	     FETCH cur INTO v_charteredMode,v_startTime,v_returnTime,v_orderId;
+	     
+        END WHILE;
+        
+        -- 关闭游标
+        CLOSE cur;             
+		
+	
+    END$$
+
+DELIMITER ;

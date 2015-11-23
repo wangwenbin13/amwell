@@ -1,0 +1,28 @@
+package com.pig84.ab.vo.coupon;
+
+import java.util.List;
+
+import com.pig84.ab.dao.ICouponRuleDao;
+import com.pig84.ab.vo.PassengerInfo;
+import com.pig84.ab.vo.bean.AppVo_1;
+
+/**
+ * 推荐人数规则
+ * @author gxt
+ *
+ */
+public class RecommendNumberRule extends Rule {
+	
+	private ICouponRuleDao couponRuleDao;
+
+	public RecommendNumberRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public List<PassengerInfo> filter(Object obj,List<PassengerInfo> passengers) {
+		this.couponRuleDao=(ICouponRuleDao)obj;
+		List<AppVo_1> voList=couponRuleDao.getRecommendNumber(passengers.get(0).getPassengerId(),getTheValue(),getTheCondition());
+		return getResult(voList, passengers);
+	}
+}

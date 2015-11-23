@@ -1,0 +1,94 @@
+package com.pig84.ab.service;
+
+import java.util.List;
+
+import com.pig84.ab.vo.Coord;
+import com.pig84.ab.vo.LineBaseInfo;
+import com.pig84.ab.vo.LineSearchCondition;
+import com.pig84.ab.vo.ParamVo;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_10;
+import com.pig84.ab.vo.bean.AppVo_13;
+import com.pig84.ab.vo.bean.AppVo_14;
+import com.pig84.ab.vo.bean.AppVo_15;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_6;
+
+/**
+ * 线路相关接口
+ * 
+ * @author zhangqiang
+ *
+ */
+public interface ILineService {
+	/** 获取线路列表 **/
+	public List<LineBaseInfo> getLineInfoByPage(LineSearchCondition searchCondition);
+
+	/** 获取城市列表 **/
+	public List<AppVo_1> getCityList(String cityName);
+
+	/** 一般用户或没登陆用户 **/
+	public List<LineBaseInfo> getLineInfoByPageNotIncludeHW(LineSearchCondition searchCondition);
+
+	/** 获取常用线路 **/
+	public List<AppVo_10> getBuyingLine(String passengerid);
+
+	/** 获取线路发车时间 **/
+	public String getStartTime(String linebaseid);
+
+	/** 历史购票班车 **/
+	public List<AppVo_10> queryHistoryLine(String passengerId, String cityName, String areaName, boolean flag);
+
+	/** 获取线路的条数 **/
+	public int queryLineCount(boolean flag, String lineType, String cityName, String areaName, String stationName);
+
+	/**
+	 * 将line_user_application表中的数据 和line_user_application_station表中的数据转换
+	 **/
+	public int conversionValue();
+
+	/** 更新招募相关信息 **/
+	public void updateSomeTable();
+
+	/** 查询是否执行过conversion方法 **/
+	public int queryConversionTimes();
+
+	/** 购票历史 **/
+	public List<AppVo_15> getHistoryLine(String imei, Coord coord, String cityName, String passengerid);
+
+	/** 拆分线路列表 **/
+	public List<AppVo_14> getSplitLine(ParamVo paramVo);
+
+	/** 附近站点搜索 **/
+	public List<AppVo_14> getNearSplitLine(ParamVo paramVo);
+
+	/** 商家介绍 **/
+	public AppVo_1 geBusinessRemark(String businessId);
+
+	/** 申请添加班车 **/
+	public int addApplyClass(String passengerId, String lineClassId);
+
+	/** 根据线路ID获取站点信息 **/
+	public List<AppVo_5> getStationsByLineId(String lineId);
+
+	/** 获取车辆当前站点信息 **/
+	public AppVo_6 getBusPosition(String lineId, String stationId);
+
+	/** 用户发起线路 **/
+	public String addUserLine(String passengerid, String stime, String xtime, String haddr, String caddr, Coord hco, Coord cco, String km, String cityName);
+
+	/** 招募报名 **/
+	public String enrollLine(String passengerid, String lineId);
+
+	/** 招募线路详细 **/
+	public AppVo_15 enrollLineInfo(String passengerid, String lineId);
+
+	/** 我的招募线路 **/
+	public List<AppVo_15> enrollLineList(String passengerid, String type, String currentPage, String pageSize);
+
+	/** 加上招募线路的线路搜索 **/
+	public List<AppVo_14> getSplitLineAndUserApp(ParamVo paramVo);
+
+	/**加上招募线路的线路搜索(分页)**/
+	public List<AppVo_14> getSplitLineAndUserAppByPage(ParamVo paramVo);
+}

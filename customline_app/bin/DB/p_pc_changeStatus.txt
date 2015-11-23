@@ -1,0 +1,53 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP PROCEDURE IF EXISTS `p_pc_changeStatus`$$
+
+CREATE DEFINER=`root`@`%` PROCEDURE `p_pc_changeStatus`()
+BEGIN
+	
+	-- 拼车信息ID
+	DECLARE v_pcLineId VARCHAR(50);
+	
+	-- 拼车信息发布时间
+	DECLARE v_pcLineCreateTime VARCHAR(50);
+	
+	-- 定义游标结束标识
+	DECLARE STOP INT DEFAULT 0;
+	
+	DECLARE cur CURSOR FOR (SELECT pcLineId,createOn FROM pc_line WHERE lineStatus = '1');-- 线路状态 1：已发布 2：已删除 3.已过期 
+	
+	-- 声明游标的异常处理，设置一个终止标记 
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP = 1; 
+	
+	-- 打开游标
+	OPEN cur;
+	
+	FETCH cur INTO v_pcLineId,v_pcLineCreateTime;
+		
+         WHILE STOP <> 1 DO
+		
+		-- 当前时间-创建时间与过期时间进行比较 (UNIX_TIMESTAMP取时间戳秒数)  validityDays的值可能会变化
+		IF (ROUND((UNIX_TIMESTAMP(NOW())-UNIX_TIMESTAMP(v_pcLineCreateTime)))) > (SELECT MIN(validityDays)*24*60*60 FROM pc_line_validity) THEN 
+		        
+			-- 修改拼车信息状态为已过期（3:已过期）
+			UPDATE pc_line SET lineStatus = '3' WHERE pcLineId = v_pcLineId;
+			
+			-- 修改线路对应线路推荐消息中的线路条数，条数减一
+			UPDATE sys_msg_info SET msgContext = CONCAT(LEFT(msgContext,CHAR_LENGTH(msgContext)-3),(LEFT(RIGHT(msgContext,3),1)-1),RIGHT(msgContext,2)) WHERE msgContext LIKE CONCAT('%',v_pcLineId,'%');
+				
+		END IF;
+             
+              -- 获取下一行数据。
+	     FETCH cur INTO v_pcLineId,v_pcLineCreateTime;
+	     
+        END WHILE;
+        
+        -- 关闭游标
+        CLOSE cur;             
+		
+	
+    END$$
+
+DELIMITER ;

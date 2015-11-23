@@ -1,0 +1,129 @@
+#domain
+domain=
+
+#config
+init.ticketLimit=8
+init.checkTicketSTime=30
+init.checkTicketETime=0
+
+#run type 1:test 2:real
+run_type=1
+
+#vipPassenger
+vip.telephone=15827126859,18520826570,13265830480,13028872323,18670723272,13147090496,18664301785
+
+#tichetColor
+tichetColor=71d77f,fe6b6b,28c940,ffc035,ff7cdf,c372ff,9dd94c
+
+# Send SMS URL
+pns.sms.send=http://192.168.9.6:10086/api/sms
+
+#this server for customline
+statistics =  http://192.168.9.6:10055/addStatTotalHttpAction/addStatTotal.action
+
+#redis
+redis.addr=192.168.9.6
+redis.auth=redis-pig84
+redis.port=6379
+redis.max_idle=300
+redis.max_tolal=300
+redis.timeout=10000
+
+#upload root identify url
+ftp.image.root=busonline
+ftp.image.root.hpic=h_pic
+ftp.image.root.opic=o_pic
+
+#image download http server
+http.root.url=http\://192.168.9.6\:10053
+
+#AliPay config
+RECHARG_BACK_RUL=http://218.17.21.84:10054/customline_app/app_pay/monitorAliPayResult.action
+RECHARG_BACK_RUL_PAY=http://218.17.21.84:10054/customline_app/app_pay/monitorAliPayResult_pay.action
+RECHARG_BACK_RUL_PAY_BC=http://218.17.21.84:10054/customline_app/app_chartered/monitorAliPayBcResult_pay.action
+
+#send CharteredLine number one day
+charteredLineNum=300
+
+#weixin info
+weixin.app.id=wx00a756acf10b9960
+weixin.app.secret=3d6dc7b1cf3ef22fdd640b40960ce320
+weixin.app.key=5EUeZW3NHCEDY9YquU2r68HD44y5yMo9YztOexhGWLLBxtJZjdtIPYrH2FTmZxPgdu7WchOXfGkOxoTEyd7edyD2QwlTNLpHESBeOuvqFrjXZovpTBqVWrP9HsA8NdPC
+weixin.app.partner=1225903501
+#6b0030d786927ae4add0fe300c3f5551 8934e7d15453e97507ef794cf7b0519d
+weixin.app.partner.key=6b0030d786927ae4add0fe300c3f5551
+weixin.app.tokenurl=https://api.weixin.qq.com/cgi-bin/token
+weixin.app.grant.type=client_credential
+weixin.app.expire.errcode=42001
+weixin.app.fail.errcode=40001
+weixin.app.gateurl=https://api.weixin.qq.com/pay/genprepay?access_token=
+weixin.app.access.token=access_token
+weixin.app.errorcode=errcode
+weixin.app.sign.method=sha1
+#xiaozhubus
+weixin.app.notify.weixin.url=http://218.17.21.84:10054/customline_app/app_pay/monitorWeiXinPayResult_pay.action
+#baoche
+weixin.app.notify.weixin.bc.url=http://218.17.21.84:10054/customline_app/app_pay/monitorWeiXinPayResultBc_pay.action
+
+#app to do search
+search_by_location=http://api.map.baidu.com/place/v2/search?radius=2000&page_size=20&output=json&ak=SvC2Pda55VOcawpBcw6dyrao
+search_by_region=http://api.map.baidu.com/place/v2/search?page_size=20&output=json&ak=SvC2Pda55VOcawpBcw6dyrao
+search_by_region_suggestion=http://api.map.baidu.com/place/v2/suggestion?output=json&ak=qbnXoYlsWXWQ86N0pLe0fYsv
+search_city=http://api.map.baidu.com/location/ip?ak=C61951e05e99292fdb7007de87092af7
+
+#company telephone
+companyTel=400-168-1866
+#working hours
+workingHours=8:30-18:00
+
+#ishekou ST check Url
+ishekou_checkST_url=https://ctsso.zte.com.cn:9443/sso/serviceValidate?service=http://bsapp.pig84.com
+
+#header pic url waiwang
+header.pic.ip=http://192.168.9.6:17530
+header.pic.directory=busonline/h_pic
+
+#weixin return
+weixin.app.returnurl=https\://api.mch.weixin.qq.com/secapi/pay/refund
+
+#new weixin notify shangxiaban xianwang
+new.weixin.app.notify.shangxiaban.url=http://218.17.21.84:10054/customline_app/app_weixinReturn/monitorWeiXinPayResult_payNew.action
+#new weixin notify baoche xianwang
+new.weixin.app.notifu.baoche.url=http\://218.17.21.84:10054/customline_app/app_weixinReturn/monitorWeiXinPayResultBc_payNew.action
+
+#weixin zhengshu  9.11 D:/apiclient_cert.p12   ceshi /home/certs/apiclient_cert.p12  
+weixin.cert=apiclient_cert.p12
+
+#paypal.sandbox=https\://www.sandbox.paypal.com/cgi-bin/webscr
+paypal.conform=https\://www.paypal.com/cgi-bin/webscr
+
+#google_place_url 
+google_place_url=https://maps.googleapis.com/maps/api/place/textsearch/json?key=AIzaSyALbtaTsM-laJv0HWjqfyNsMWSFQWFk91c&radius=50000
+#coupon grant ExecutorService poolSize
+executorPoolSize=10
+
+# Too big pool size may cause too many threads at one time,
+# but too small pool size may block Tomcat threads to wait for connections release, which cause more threads at one time.
+# And less timeout time cause breaking business, more timeout cause connections block.
+# So be brave, boy...
+httpclient.pool.max=200
+httpclient.pool.maxPerHost=100
+httpclient.pool.timeout=10000
+httpclient.connect.timeout=5000
+httpclient.connect.socket.timeout=5000
+
+crypto.des.key=@amwell@
+
+#paypal_pay
+paypal_pay=http://218.17.21.84:10099/customline_pay/paypal_pay/PayPalReturnOrder.action
+
+#weixin_pay
+weixin_pay=http://218.17.21.84:10099/customline_pay/weixin_pay/WeiXinReturnOrder.action
+
+#HLC
+hlc_regist = http://www.huilc.top:8280/xiaozhuBus/register
+hlc_user = http://www.huilc.top:8280/xiaozhuBus/getInvestUser
+
+#pao_jiao
+game_names=AYY,PJYX,SJWS,PPZS,QT,ML,JCJX,QMSSG,TTDDZ,MHSM,WYXX,ZLZR,SGZZ
+coupon_total_val=2000

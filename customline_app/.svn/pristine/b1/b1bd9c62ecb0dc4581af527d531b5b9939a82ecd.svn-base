@@ -1,0 +1,48 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP PROCEDURE IF EXISTS `p_line_changeinfo`$$
+
+CREATE DEFINER=`admin`@`%` PROCEDURE `p_line_changeinfo`(in_linebaseid VARCHAR(50))
+BEGIN
+
+	-- 修改后的线路id
+	DECLARE v_lineid VARCHAR(50);
+	
+	-- 用户id
+	DECLARE v_passengerid VARCHAR(50);
+	
+	-- 定义游标结束标识
+	DECLARE STOP INT DEFAULT 0;
+	
+	DECLARE cur CURSOR FOR (SELECT lineBaseId,passengerid FROM lease_base_info WHERE lineBaseId = in_linebaseid GROUP BY passengerid);-- 买过该线路的所有用户 
+	
+	-- 声明游标的异常处理，设置一个终止标记 
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP = 1; 
+	
+	-- 删除老数据
+	DELETE FROM line_change_info WHERE lineBaseId = in_linebaseid;
+	
+	-- 打开游标
+	OPEN cur;
+	
+	FETCH cur INTO v_lineid,v_passengerid;
+		
+         WHILE STOP <> 1 DO
+		        
+			-- 插入数据
+			INSERT INTO line_change_info (linebaseid,passengerid) VALUES (v_lineid,v_passengerid);
+             
+              -- 获取下一行数据。
+	     FETCH cur INTO v_lineid,v_passengerid;
+	     
+        END WHILE;
+        
+        -- 关闭游标
+        CLOSE cur;             
+		
+	
+    END$$
+
+DELIMITER ;

@@ -1,0 +1,165 @@
+package com.action;
+
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+
+import com.bean.PayBean;
+import com.service.WeiXinService;
+import com.utils.Http;
+import com.utils.Json;
+import com.utils.PropertyManage;
+import com.utils.WeiXinUtil.IdGenerator;
+import com.utils.WeiXinUtil.PostXmlUtil;
+import com.utils.WeiXinUtil.PrepayIdRequestHandler;
+import com.utils.WeiXinUtil.ResponseHandler;
+import com.utils.WeiXinUtil.WXUtil;
+import com.utils.WeiXinUtil.WeiXinPayConfig;
+
+/**
+ * 微信宝相关业务
+ * @author zhangqiang
+ * @time 2015-09-21 10:23:25
+ */
+@ParentPackage("no-interceptor")
+@Namespace("/weixin_pay")
+@SuppressWarnings("all")
+@ExceptionMappings( { @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class WeiXinPayAction extends BaseAction {
+	
+	/**
+	 * 构建微信订单
+	 * @param orderNo 商品订单号
+	 * @return 签名
+	 * @throws IOException 
+	 */
+	@Action(value = "bulidWeiXinPayOrder", results = { @Result(type = "json") })
+	public String bulidWeiXinPayOrder() throws IOException{
+		String orderNo = request.getParameter("orderNo"); //商品订单号
+		String orderInfoUrl = PropertyManage.get("ORDER_INFO_URL");//获取商品详细地址
+		String resp = Http.post(orderInfoUrl, "orderNo",orderNo);
+
+		//商品信息有误
+		if(StringUtils.isEmpty(orderNo) || StringUtils.isEmpty(resp)){
+			write("-1");
+			return null;
+		}
+		
+		PayBean bean = new PayBean();
+		bean = Json.fromJson(resp, PayBean.class);
+		String sign = WeiXinService.bulidPayOrder(bean, request, response);
+		write(sign);
+		return null;
+	}
+	
+	/**
+	 * 微信回调地址（第三方回调）
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "WeiXinReturnUrl", results = { @Result(type = "json") })
+	public String WeiXinReturnUrl() throws IOException{
+		// 创建支付应答对象
+		ResponseHandler resHandler = new ResponseHandler(response, request);
+		resHandler.setKey(WeiXinPayConfig.KEY_PARTNER_KEY);
+		String return_code = resHandler.getParameter("return_code");// 返回状态码
+		String type = "6";// 微信APP端
+
+		String orderInfoUrl = PropertyManage.get("Notice_Merchant_Url");//商户支付通知地址
+
+		String out_trade_no = resHandler.getParameter("out_trade_no");//商户订单号(商户传过去的订单号)
+		String total_fee = resHandler.getParameter("total_fee");//交易金额 
+		String transaction_id = resHandler.getParameter("transaction_id");//第三方订单号
+		Map<String,String> args = new HashMap<>();
+		args.put("orderNo",out_trade_no);
+		args.put("tradeOrderNo", transaction_id);
+		args.put("fee", total_fee);
+		args.put("payModel", "2");//微信支付
+		if ("SUCCESS".equals(return_code.toUpperCase())) {
+			// 判断签名
+			if (resHandler.isTenpaySignNew()) {//签名成功
+				args.put("tradeType", "1");
+				resHandler.sendToCFT("<xml><return_code><![CDATA[SUCCESS]]></return_code></xml>");
+			}else{//签名失败
+				args.put("tradeType", "2");
+			}
+		}else{
+			args.put("tradeType", "2");
+		}
+		Http.post(orderInfoUrl, args);//通知商户支付结果
+		return null;
+	}
+	
+	/**
+	 * 微信退货地址
+	 * @param realReturn 退款金额
+	 * @param totalPrice 订单总额
+	 * @param leaseOrderNo 商户订单号
+	 * @return 0:失败   1：成功
+	 */
+	@Action(value = "WeiXinReturnOrder", results = { @Result(type = "json") })
+	public String WeiXinReturnOrder(){
+		String realReturn = request.getParameter("realReturn");//退款金额
+		String totalPrice = request.getParameter("totalPrice");//订单总额
+		String leaseOrderNo = request.getParameter("leaseOrderNo");//商户订单号
+		
+		StringBuilder xml = new StringBuilder();
+		PrepayIdRequestHandler prepayReqHandler = new PrepayIdRequestHandler(request, response);//获取prepayid的请求类
+		xml.append("<xml>");
+		xml.append("<appid>"+WeiXinPayConfig.KEY_APP_ID+"</appid>"); //公众账号ID
+		prepayReqHandler.setParameter("appid", WeiXinPayConfig.KEY_APP_ID);
+		
+		xml.append("<mch_id>"+WeiXinPayConfig.KEY_PARTNER+"</mch_id>");//商户号
+		prepayReqHandler.setParameter("mch_id", WeiXinPayConfig.KEY_PARTNER);
+		
+		String nonce_str = WXUtil.getNonceStr();
+		xml.append("<nonce_str>"+nonce_str+"</nonce_str>");//随机字符串
+		prepayReqHandler.setParameter("nonce_str",nonce_str);
+		
+		xml.append("<op_user_id>"+WeiXinPayConfig.KEY_PARTNER+"</op_user_id>");//操作员  操作员帐号, 默认为商户号
+		prepayReqHandler.setParameter("op_user_id",WeiXinPayConfig.KEY_PARTNER);
+		
+		xml.append("<out_trade_no>"+leaseOrderNo+"</out_trade_no>");//商户订单号
+		prepayReqHandler.setParameter("out_trade_no",leaseOrderNo);
+		
+		String returnNo = IdGenerator.seq();
+		xml.append("<out_refund_no>"+returnNo+"</out_refund_no>");//商户退款单号    商户系统内部的退款单号，商户系统内部唯一，同一退款单号多次请求只退一笔
+		prepayReqHandler.setParameter("out_refund_no",returnNo);
+		
+		
+		BigDecimal refund_fee = new BigDecimal(realReturn).multiply(new BigDecimal("100"));
+		xml.append("<refund_fee>"+String.valueOf(refund_fee.intValue())+"</refund_fee>");//退款总金额      单位为分，只能为整数
+		prepayReqHandler.setParameter("refund_fee",String.valueOf(refund_fee.intValue()));
+		
+		BigDecimal total_fee = new BigDecimal(totalPrice).multiply(new BigDecimal("100"));
+		xml.append("<total_fee>"+String.valueOf(total_fee.intValue())+"</total_fee>");//订单总金额
+		prepayReqHandler.setParameter("total_fee",String.valueOf(total_fee.intValue()));
+		
+		//生成签名
+		String sign = prepayReqHandler.createSignMd5();
+		xml.append("<sign>"+sign+"</sign>");//签名
+		xml.append("</xml>");
+		String url = PropertyManage.get("weixin.app.returnurl");//微信退款的路径
+		int statu = 0;
+		try {
+			statu = PostXmlUtil.doPost(url,xml.toString().trim());
+			logger.info("退款{}成功 状态：{}", returnNo, statu);
+		} catch (Exception e) {
+			logger.error("退款失败", e);
+		}
+		
+		write(statu);//0：失败   1：成功
+		
+		return null;
+	}
+}

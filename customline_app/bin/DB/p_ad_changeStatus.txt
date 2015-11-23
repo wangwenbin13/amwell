@@ -1,0 +1,66 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP PROCEDURE IF EXISTS `p_ad_changeStatus`$$
+
+CREATE DEFINER=`root`@`%` PROCEDURE `p_ad_changeStatus`()
+BEGIN
+	-- 广告id
+	DECLARE v_ad_id VARCHAR(50);
+	
+	-- 生效时间
+	DECLARE v_effectiveTime VARCHAR(50);
+	
+	-- 过期时间
+	DECLARE v_expirationTime VARCHAR(50);
+	
+	-- 广告状态
+	DECLARE v_adStatus VARCHAR(50);
+	
+	
+	DECLARE STOP INT DEFAULT 0;
+	
+	DECLARE cur CURSOR FOR (SELECT ad_id,effectiveTime,expirationTime,adStatus FROM ad_config WHERE adStatus IN(0,1));-- 0:待使用 1:使用中 2:已过期 3:已删除
+	
+	
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP = 1; 
+	
+	
+	OPEN cur;
+	
+	FETCH cur INTO v_ad_id,v_effectiveTime,v_expirationTime,v_adStatus;
+		
+         WHILE STOP <> 1 DO
+         
+                IF v_adStatus = 0 THEN -- 判断并修改待试用状态下的广告状态
+                
+			IF UNIX_TIMESTAMP(NOW()) > UNIX_TIMESTAMP(v_effectiveTime) THEN 
+				
+				UPDATE ad_config SET adStatus = '1' WHERE ad_id = v_ad_id;
+					
+			END IF;
+                
+                END IF;
+                
+                IF v_adStatus = 1 THEN -- 判断并修改使用中状态下的广告状态
+                
+			IF UNIX_TIMESTAMP(NOW()) > UNIX_TIMESTAMP(v_expirationTime) THEN 
+				
+				UPDATE ad_config SET adStatus = '2' WHERE ad_id = v_ad_id;
+					
+			END IF;
+                
+                END IF;
+              
+	     FETCH cur INTO v_ad_id,v_effectiveTime,v_expirationTime,v_adStatus;
+	     
+        END WHILE;
+        
+        
+        CLOSE cur;             
+		
+	
+    END$$
+
+DELIMITER ;

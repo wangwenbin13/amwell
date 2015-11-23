@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context>
+    <Resource name="jdbc/customline"
+       auth="Container"
+       type="javax.sql.DataSource"
+       maxActive="150"
+       maxIdel="50"
+       maxWait="1000"
+       username="pig84"
+       password="pig84_com"
+       validationQuery="select 1"
+       testWhileIdle="true"
+       driverClassName="com.mysql.jdbc.Driver"
+       url="jdbc:mysql://rdsy8v6tmae71as75oql.mysql.rds.aliyuncs.com:3306/amwellcustomline?useUnicode=true&amp;characterEncoding=utf8">
+    </Resource>
+</Context>

@@ -1,0 +1,47 @@
+package com.pig84.ab.vo.coupon;
+
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.pig84.ab.service.IPassengerInfoService;
+import com.pig84.ab.utils.ApplicationContextHolder;
+import com.pig84.ab.utils.CouponThread;
+import com.pig84.ab.utils.Event;
+import com.pig84.ab.utils.Event.Listener;
+import com.pig84.ab.utils.ThreadPoolUtil;
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * Coupon Listener.
+ * 
+ * @author GuoLin
+ *
+ */
+public class CouponListener implements Listener {
+	
+	private static final Logger logger = LoggerFactory.getLogger(CouponListener.class);
+	
+	@Override
+	public void trigger(Event event, Map<String, Object> data) {
+		IPassengerInfoService service1 = ApplicationContextHolder.getBean(IPassengerInfoService.class);
+		PassengerInfo user = null;
+		if (event == Event.REGISTER) {
+			user = (PassengerInfo) data.get("user");
+			logger.info("注册，用户手机：{}，开始优惠券发放",user.getTelephone());
+		} else if (event == Event.BUYTICKET) {
+			String userid = (String) data.get("userId");
+			user = service1.getPassengerById(userid, null);
+			logger.info("买票，用户手机：{}，开始优惠券发放",user.getTelephone());
+		}
+		if(null!=user){
+			ThreadPoolUtil.submit(new CouponThread(user));
+		}
+	}
+
+	public static void init() {
+		CouponListener listener = new CouponListener();
+		Event.registerListener(Event.REGISTER, listener);
+		Event.registerListener(Event.BUYTICKET, listener);
+	}
+
+}

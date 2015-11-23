@@ -1,0 +1,68 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP PROCEDURE IF EXISTS `p_bc_changeStatus`$$
+
+CREATE DEFINER=`root`@`%` PROCEDURE `p_bc_changeStatus`()
+BEGIN
+	
+	-- 包车信息ID
+	DECLARE v_bcLineId VARCHAR(50);
+	
+	-- 包车信息发布时间
+	DECLARE v_bcLineCreateTime VARCHAR(50);
+	
+	-- 包车信息过期时间
+	DECLARE v_bcLineExpireTime VARCHAR(50);
+	
+	-- 包车信息状态
+	DECLARE v_bcLineStatus VARCHAR(10);
+	
+	-- 定义游标结束标识
+	DECLARE STOP INT DEFAULT 0;
+	
+	DECLARE cur CURSOR FOR (SELECT bc_line_id,createOn,expireTime,lineStatus FROM amwellcustomline.`bc_line` WHERE lineStatus IN(0,1,2,3));-- 线路状态 0:待审核 1：未通过 2:待报价 3：已报价 
+	
+	-- 声明游标的异常处理，设置一个终止标记 
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP = 1; 
+	
+	-- 打开游标
+	OPEN cur;
+	
+	FETCH cur INTO v_bcLineId,v_bcLineCreateTime,v_bcLineExpireTime,v_bcLineStatus;
+		
+         WHILE STOP <> 1 DO
+		
+		-- 当前时间-创建时间与过期时间进行比较 (UNIX_TIMESTAMP取时间戳秒数)  paraValue的值可能会变化
+		-- IF (ROUND((UNIX_TIMESTAMP(NOW())-UNIX_TIMESTAMP(v_bcLineCreateTime)))) > (SELECT MIN(paraValue)*60*60 FROM bc_set) THEN 
+		-- 如果当前时间大于过期时间，则表示已过期
+		IF UNIX_TIMESTAMP(NOW()) > UNIX_TIMESTAMP(v_bcLineExpireTime) THEN 
+		        
+		        IF v_bcLineStatus = 0 THEN
+		          -- 如果待审核状态下过期了，则借用驳回内容字段存-1，标识是待审核已过期
+			  UPDATE bc_line SET rejectContent = '-1' WHERE bc_line_id = v_bcLineId;
+			  
+		        END IF;
+			
+			-- 修改包车信息状态为已过期（4:已过期）
+			UPDATE amwellcustomline.`bc_line` SET lineStatus = 4 WHERE bc_line_id = v_bcLineId;
+			
+			-- 修改商户报价信息为已过期（2:已过期）
+			-- UPDATE amwellcustomline.`bc_business_bidding` SET offerStatus = 2 WHERE bc_line_id = v_bcLineId AND offerStatus = 0;
+			UPDATE amwellcustomline.`bc_business_bidding` SET offerStatus = 2 WHERE bc_line_id = v_bcLineId;
+				
+		END IF;
+             
+              -- 获取下一行数据。
+	     FETCH cur INTO v_bcLineId,v_bcLineCreateTime,v_bcLineExpireTime,v_bcLineStatus;
+	     
+        END WHILE;
+        
+        -- 关闭游标
+        CLOSE cur;             
+		
+	
+    END$$
+
+DELIMITER ;

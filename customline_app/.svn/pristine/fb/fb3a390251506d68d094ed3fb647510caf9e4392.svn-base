@@ -1,0 +1,59 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP PROCEDURE IF EXISTS `p_recommend_award_del`$$
+
+CREATE DEFINER=`admin`@`%` PROCEDURE `p_recommend_award_del`()
+BEGIN
+	
+	
+	DECLARE v_recommend_award_id VARCHAR(50);
+	
+	
+	DECLARE v_recommend_award_create_on VARCHAR(50);
+	
+	
+	DECLARE STOP INT DEFAULT 0;
+	
+	DECLARE cur CURSOR FOR (SELECT id,createOn FROM recommend_award_info WHERE delFlag = '0');
+	
+	
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP = 1; 
+	
+	
+	OPEN cur;
+	
+	FETCH cur INTO v_recommend_award_id,v_recommend_award_create_on;
+		
+         WHILE STOP <> 1 DO
+         
+                -- 将状态为0的超过7日的推荐信息状态改为失效
+		
+		IF (UNIX_TIMESTAMP(NOW())-UNIX_TIMESTAMP(v_recommend_award_create_on)) > 7*24*60*60 THEN 
+			
+			UPDATE recommend_award_info SET delFlag = '1' WHERE id = v_recommend_award_id;
+				
+		END IF;
+             
+              
+	     FETCH cur INTO v_recommend_award_id,v_recommend_award_create_on;
+	     
+        END WHILE;
+        
+        
+        CLOSE cur;             
+		
+	
+    END$$
+
+DELIMITER ;
+
+
+
+
+DELIMITER $$
+
+CREATE EVENT `e_recommend_award_del` ON SCHEDULE EVERY 1 DAY STARTS '2015-06-27 02:00:00' ON COMPLETION PRESERVE ENABLE DO CALL p_recommend_award_del$$
+
+DELIMITER ;

@@ -1,0 +1,77 @@
+body,div,p,ul,li,input,h2{margin:0;padding: 0}
+body{font-family: "Heiti SC,Helvetica, STHeiTi, Arial, sans-serif"; -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%;font-size: 12px;background: #ed393a ;background-size:contain;
+}
+em{font-style:normal;}
+input{-webkit-appearance: none;}
+img{width:100%;}
+.clearfix:after{display:block; content:"clear"; height:0; clear:both; overflow:hidden; visibility:hidden;}
+.wrap{margin:0 auto;text-align:center;
+	background-image: -webkit-gradient(linear, 0 0, 0 100%, color-stop(.62, rgba(44, 56, 71, 1)), color-stop(.62, rgba(237, 57, 58, 1)), to(rgba(237, 57, 58, 1)));}
+.main{max-width:750px;margin:0 auto;background:url(../images/bg.png) no-repeat center top;background-size:contain;}
+.tip{padding-top:60px;color:#fef6da;overflow: hidden;font-weight:bold;}
+.tip.tipIndex p{font-size:42px;}
+.tip.tipIndex p:nth-child(2){margin-top:8px;font-size:24px;}
+.tip.tipIndex p:nth-child(3){font-size:25px;margin-top:5px;}
+.tip .em1{color:#ffe689;font-size:38px;margin:0 3px;}
+.tip.tipOther{font-size: 18px;margin-top: 0;padding-top: 51px}
+.tip.tipOther .em2{color:#ffe689;margin:0 3px;}
+.tip.tipOther p{margin-top:5px;}
+.box1{width:100%;margin-top:11px;padding-top:26%;padding-bottom:19%;background:url(../images/bg1.png) no-repeat center top ;background-size:contain;}
+.box1 input{display:block;margin-left:auto;margin-right:auto;width:62%;border-radius:8px;-webkit-tap-highlight-color:rgba(255,255,255,0);}
+.box1 input[type="tel"]{background:#ffdfb5;border:1px solid #ebba79;height:2.75rem;text-indent:8px;color:#747576;font-size: 1.063rem;box-shadow:inset 1px 0 0 #edcea8,inset 0 1px 0 #c7ac8c;}
+.box1 input[type="button"]{background: #1cbd9e;color:#fff;border:1px solid #ebba79;height:3rem;line-height:2.9rem;font-size: 1.1rem;}
+.box1 input:nth-of-type(3){margin-top: 12px;}
+.txt{text-align: left;width: 89%;margin:0 auto;color: #ffd59e;padding-bottom: 10px;font-size: 0.6875rem;}
+.logo{float: right;margin-top: 15px;width:104px;height:33px;background:url(../images/logo.png) no-repeat right top ;background-size:104px 33px}
+/*4 4s*/
+@media only screen and (device-height :480px) and (-webkit-device-pixel-ratio:2){
+	.tip{padding-top:42px;}
+    .tip.tipIndex p{font-size:34px;}
+    .tip.tipIndex p:nth-child(2){margin-top:8px;font-size:24px;}
+    .tip.tipIndex p:nth-child(3){font-size:25px;margin-top:5px;}
+    .tip .em1{font-size:38px;margin:0 3px;}
+    .box1{padding-top:26%;padding-bottom:15%;margin-top:10px;}
+}
+/*ºÊ»›5*/
+@media (device-height:568px) and (-webkit-min-device-pixel-ratio:2) {
+	.tip{padding-top:42px;}
+    .tip.tipIndex p{font-size:34px;}
+    .tip.tipIndex p:nth-child(2){margin-top:8px;font-size:24px;}
+    .tip.tipIndex p:nth-child(3){font-size:25px;margin-top:5px;}
+    .tip .em1{font-size:38px;margin:0 3px;}
+    .box1{padding-top:26%;padding-bottom:15%;margin-top:10px;}
+   
+}
+/*6*/
+@media (min-device-width : 375px) and (max-device-width : 667px) and (-webkit-min-device-pixel-ratio : 2) {
+   .tip{padding-top:58px;}
+   .tip.tipIndex p{font-size:37px;}
+   .tip.tipIndex p:nth-child(2){margin-top:8px;font-size:27px;}
+   .tip.tipIndex p:nth-child(3){font-size:28px;margin-top:5px;}
+   .tip .em1{font-size:40px;}
+   .tip.tipOther{font-size: 22px;}
+   .tip.tipOther p{margin-top:5px;}
+   .box1{padding-top:28%;padding-bottom:13%;margin-top:3.5px;}
+   .box1 input[type="tel"]{height:50px;font-size: 22px;}
+   .box1 input[type="button"]{height:54px;font-size: 22px;}
+   .txt{font-size: 13px;}
+}
+/*6+*/
+@media (min-device-width : 414px) and (max-device-width : 736px) and (-webkit-min-device-pixel-ratio : 3) {
+	.tip{padding-top:60px;}
+	.tip.tipIndex p{font-size:47px;}
+	.tip.tipIndex p:nth-child(2){margin-top:7px;font-size:30px;}
+	.tip.tipIndex p:nth-child(3){font-size:31px;margin-top:6px;}
+    .tip .em1{font-size:44px;}
+    .tip.tipOther{font-size: 27px;}
+    .tip.tipOther p{margin-top:7px;}
+    .box1{padding-top:28%;padding-bottom:14%;margin-top:17px;}
+    .box1 input[type="tel"]{height:54px;font-size: 25px;}
+    .box1 input[type="button"]{height:60px;font-size: 25px;}
+    .txt{font-size: 15px;}
+}
+
+@media (min-device-width :750px) {
+   .box1{padding-top:26%;padding-bottom:28%;}
+}
+

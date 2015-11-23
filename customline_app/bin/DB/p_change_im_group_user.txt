@@ -1,0 +1,69 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP PROCEDURE IF EXISTS `p_change_im_group_user`$$
+
+CREATE DEFINER=`admin`@`%` PROCEDURE `p_change_im_group_user`()
+BEGIN
+	DECLARE v_groupId VARCHAR(50);
+	
+	DECLARE v_lineBaseId VARCHAR(50);
+	
+	DECLARE v_nickName VARCHAR(50);
+	
+	DECLARE v_userId VARCHAR(50);
+	
+	DECLARE v_bstation VARCHAR(50);
+	
+	DECLARE STOP_1,STOP_2 INT DEFAULT 0;
+	
+	
+	DECLARE cur_1 CURSOR FOR (SELECT groupId,lineBaseId FROM im_group_info);
+	
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP_1 = 1; 
+	
+        TRUNCATE TABLE im_ug_info;
+	
+	OPEN cur_1;
+	
+	FETCH cur_1 INTO v_groupId,v_lineBaseId;
+		
+         WHILE STOP_1 <> 1 DO
+             
+             
+             BEGIN
+		     
+		     DECLARE cur_2 CURSOR FOR (SELECT p.nickName,iui.userId,lsi.bstation FROM lease_base_info lbi,line_business_order lbo,line_class_info lci,passenger_info p,im_user_info iui,line_split_info lsi WHERE lbi.slineId = lsi.sid AND lbi.lineBaseId = v_lineBaseId AND lbi.ispay = '1' 
+	AND lbi.leaseOrderNo = lbo.leaseOrderId AND lbo.lineClassId = lci.lineClassId AND lci.orderDate = CURDATE() AND lbi.passengerId = p.passengerId AND p.passengerId = iui.passengerId);
+		     DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP_2 = 1; 
+             
+                     OPEN cur_2;
+                        
+                         FETCH cur_2 INTO v_nickName,v_userId,v_bstation;
+                         
+                         WHILE STOP_2 <> 1 DO
+			
+                           
+			    INSERT INTO `im_ug_info` (`groupId`, `userId`, `userLevel`,`userNickName`,`isTop`, `isDisturb`, `createTime`,`stationMark`) VALUES(v_groupId,v_userId,'1',v_nickName,'0','0',UNIX_TIMESTAMP(),v_bstation);
+			   
+                           FETCH cur_2 INTO v_nickName,v_userId,v_bstation;                         
+                         
+                         END WHILE;                    
+                     
+                     CLOSE cur_2;
+                     
+                     SET STOP_2=0;
+                          
+             END;
+             
+	     
+	     FETCH cur_1 INTO v_groupId,v_lineBaseId;
+	     
+        END WHILE;
+        
+        CLOSE cur_1;             	
+	
+    END$$
+
+DELIMITER ;

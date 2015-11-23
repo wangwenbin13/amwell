@@ -1,0 +1,702 @@
+package com.amwell.base;
+
+import java.lang.reflect.Method;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.handlers.BeanHandler;
+import org.apache.commons.dbutils.handlers.BeanListHandler;
+import org.apache.commons.dbutils.handlers.ColumnListHandler;
+import org.apache.commons.dbutils.handlers.MapHandler;
+import org.apache.commons.dbutils.handlers.ScalarHandler;
+import org.apache.log4j.Logger;
+
+import com.amwell.commons.DBException;
+import com.amwell.commons.JsonWriter;
+import com.amwell.commons.MyDataSource;
+import com.amwell.commons.PropertyManage;
+import com.amwell.commons.SqlBuilder;
+import com.amwell.commons.StringUtil;
+
+
+
+/**
+ * 数据库操作基础类
+ * 
+ * @author zhangqiang
+ * 
+ */
+public class BaseDao{
+	static Logger log = Logger.getLogger(BaseDao.class.getName());
+	private final static QueryRunner queryRunner = new QueryRunner(true); 
+	private String tableName;
+	private int pageSize = 20;
+	private String printSQL = PropertyManage.getInfoProperty("printSQL");
+	
+	public int getPageSize() {
+		return pageSize;
+	}
+
+	public void setPageSize(int pageSize) {
+		this.pageSize = pageSize;
+	}
+
+	public String getTableName() {
+		return tableName;
+	}
+	
+	public void setTableName(String tableName) {
+		this.tableName = tableName;
+	}
+
+	public BaseDao(String table){
+		this.tableName = table;
+		this.pageSize = 20;
+	}
+	
+	public boolean excuteSqls_trc(String[] sqls){
+		return new BaseDao_trc().excuteSqls(sqls);
+	}
+	
+	
+	/**
+	 * 数据类型转换
+	 */
+	@SuppressWarnings({ "rawtypes", "serial" })
+	private final List<Class> PrimitiveClasses = new ArrayList<Class>() {
+		{
+			add(Long.class);
+			add(Integer.class);
+			add(String.class);
+			add(java.util.Date.class);
+			add(java.sql.Date.class);
+			add(java.sql.Timestamp.class);
+		}
+	};
+
+	private final boolean isPrimitive(Class<?> cls) {
+		return cls.isPrimitive() || PrimitiveClasses.contains(cls);
+	}
+
+	public <T> T queryBean(Class<T> beanClass, String sql) {
+		return (T) queryBean(beanClass,sql,new Object[]{});
+	}
+	
+	public <T> T queryBean(Class<T> beanClass, String sql,
+			Object... params) {
+		Connection conn = MyDataSource.getConnect();
+		try {
+			T obj =  (T) queryRunner.query(conn, sql,
+					isPrimitive(beanClass) ? new ScalarHandler<T>() {
+						@SuppressWarnings("unchecked")
+						public T handle(ResultSet rs) throws SQLException {
+							Object obj = super.handle(rs);
+							return (T)obj;
+						}
+					}
+							: new BeanHandler<T>(beanClass), params);
+			if("1".equals(printSQL)){
+				System.out.println("<<<<<<<<<<<<<<<<<<<<<<<<<    "+StringUtil.replaceSql(new StringBuilder(sql), params,params == null ? 0 : params.length)+"     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+			}
+			return obj;
+		} catch (SQLException e) {
+			log.error(e);e.printStackTrace();
+			return null;
+		} finally {
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public <T> String queryBeanToJson(Class<T> beanClass,String sql) {
+		String jsonStr = "";
+		T obj = (T)queryBean(beanClass,sql);
+		if(obj != null){
+			if(obj instanceof List){
+				jsonStr = "[]";
+			}else{
+				jsonStr = JsonWriter.toJsonString(obj);
+			}
+		}
+		return jsonStr;
+	}
+	
+	public <T> String queryBeanToJson(Class<T> beanClass,String sql,Object... params) {
+		String jsonStr = "";
+		T obj = (T)queryBean(beanClass,sql,params);
+		if(obj != null){
+			if(obj instanceof List){
+				jsonStr = "[]";
+			}else{
+				jsonStr = JsonWriter.toJsonString(obj);
+			}
+		}
+		return jsonStr;
+	}
+	
+	public <T> List<T> queryList(Class<T> beanClass,String sql) {
+		return (List<T>) queryList(beanClass,sql,new Object[]{});
+	}
+	
+	public <T> List<T> queryList(Class<T> beanClass,
+			String sql, Object... params) {
+		Connection conn = MyDataSource.getConnect();
+		try {
+			List<T> objList = (List<T>) queryRunner.query(conn, sql,isPrimitive(beanClass) ? new ColumnListHandler<T>() {
+				@SuppressWarnings("unchecked")
+				protected T handleRow(ResultSet rs) throws SQLException {
+					Object obj = super.handleRow(rs);
+					return (T)obj;
+				}
+			}:new BeanListHandler<T>(beanClass), params);
+			if("1".equals(printSQL)){
+				System.out.println("<<<<<<<<<<<<<<<<<<<<<<<<<    "+StringUtil.replaceSql(new StringBuilder(sql), params,params == null ? 0 : params.length)+"     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+			}
+			if(objList.size()>0){
+				return objList;
+			}else{
+				return null;
+			}
+		} catch (SQLException e) {
+			log.error(e);e.printStackTrace();
+			return null;
+		} finally {
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public <T> String queryListToJson(Class<T> beanClass,String sql) {
+		String jsonStr = "";
+		List<T> objList = (List<T>)queryList(beanClass,sql);
+		if(objList == null){
+			objList = queryList(beanClass, sql);
+			if(objList instanceof List){
+				jsonStr = "[]";
+			}else{
+				jsonStr = JsonWriter.toJsonString(objList);
+			}
+		}
+		
+		return jsonStr;
+	}
+	public <T> String queryListToJson(Class<T> beanClass,String sql,String key, Object... params) {
+		String jsonStr = "";
+		List<T> objList = (List<T>)queryList(beanClass,sql,params);
+		if(objList == null){
+			objList = queryList(beanClass, sql);
+			if(objList instanceof List){
+				jsonStr = "[]";
+			}
+		}
+		return jsonStr;
+	}
+	
+	public <T> List<T> queryFromMysql(
+			Class<T> beanClass, String sql, int page, int count) {
+		List<T> objList = (List<T>) queryFromMysql(beanClass,sql,page,count,new Object[]{});
+		if(objList.size()>0){
+			return objList;
+		}else{
+			return null;
+		}
+		
+	}
+	
+	public <T> List<T> queryFromMysql(Class<T> beanClass, String sql, int page, int count,
+			Object... params) {
+		List<T> objList = queryList(beanClass, sql + " LIMIT ?,?",params);
+		if(objList!=null && objList.size()>0){
+			return objList;
+		}else{
+			return null;
+		}
+	}
+
+	public <T> List<T> queryFromOracle(Class<T> beanClass, String sql, int startRow, int endRow) {
+		return (List<T>) queryFromOracle(beanClass,sql,startRow,endRow,new Object[]{});
+	}
+	
+	public <T> List<T> queryFromOracle(Class<T> beanClass, String sql, int startRow, int endRow,
+			Object... params) {
+		if (startRow < 0 || endRow < 0)
+			throw new IllegalArgumentException(
+					"查询参数错误！");
+
+		sql = "SELECT * FROM (SELECT ROWNUM RN, res.* FROM (" + sql
+				+ ") res WHERE ROWNUM <=?) WHERE RN >?";
+		
+
+		return queryList(beanClass, sql,params);
+	}
+
+	public <T> List<T> queryByPage(Class<T> beanClass,
+			String sql, int condition1) {
+		return queryByPage(beanClass, sql, condition1, pageSize,
+				new Object[]{});
+	}
+	
+	public <T> List<T> queryByPage(Class<T> beanClass,
+			String sql, int currentPage, Object... params) {
+		return queryByPage(beanClass, sql, currentPage, pageSize,
+				params);
+	}
+	
+	public <T> List<T> queryByPage(Class<T> beanClass,
+			String sql, int condition1, int condition2) {
+		return queryByPage(beanClass, sql, condition1, condition2,
+				new Object[]{});
+	}
+	
+	public <T> List<T> queryByPage(Class<T> beanClass,
+			String sql, int currentPage, int pageSize, Object... params) {
+		int endIndex = pageSize;
+		int startIndex = (currentPage > 0) ? currentPage : 0;
+		Object args[] = null;
+		if(params != null){//说明是绑定变量的查询
+			int n = (params.length) + 2;//加上两个分页的参数
+			args = new Object[n];
+			for(int i = 0; i < params.length; i++){
+				args[i] = params[i];
+			}
+			args[n-2] = startIndex;
+			args[n-1] = endIndex;
+		}else{
+			args = new Object[2];
+			args[0] = startIndex;
+			args[1] = endIndex;
+		}
+		return queryFromMysql(beanClass, sql, currentPage, pageSize,args);
+	}
+	
+	public int queryCount(String sql) {
+		 int total = 0;  
+	        String field = "TOTAL";  
+	        Connection conn = MyDataSource.getConnect();
+	        String query = "SELECT COUNT(*) AS "+field+" FROM ("+sql+") t";  
+	        try {  
+	            Map<String, Object> map = (Map<String, Object>) queryRunner.query(conn, query, new MapHandler());  
+	            Set<Entry<String, Object>> set = map.entrySet();// 取得键值对的对象set集合
+	    		for (Entry<String, Object> en : set) {// 遍历键值对的集合
+	    			String n = en.getValue().toString();
+	    			total = Integer.parseInt(n); 
+	    		}
+	        } catch (Exception e) {  
+	        	log.error(e);e.printStackTrace();
+	        }finally {
+				try {
+					conn.close();
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
+			}  
+	         
+	        return total;  
+	}
+	
+	public int queryCount(String sql, Object... params) {
+		 int total = 0;  
+	        String field = "TOTAL";  
+	        Connection conn = MyDataSource.getConnect();
+	        String query = "SELECT COUNT(*) AS "+field+" FROM ("+sql+") t";  
+	        try {  
+	            Map<String, Object> map = (Map<String, Object>) queryRunner.query(conn, query, new MapHandler(), params);
+	            
+	            if("1".equals(printSQL)){
+//	    			System.out.println("<<<<<<<<<<<<<<<<<<<<<<<<<    "+StringUtil.replaceSql(new StringBuilder(sql), params,params == null ? 0 : params.length)+"     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+	    		}
+	            
+	            Set<Entry<String, Object>> set = map.entrySet();// 取得键值对的对象set集合
+	    		for (Entry<String, Object> en : set) {// 遍历键值对的集合
+	    			String n = en.getValue().toString();
+	    			total = Integer.parseInt(n); 
+	    		}
+	        } catch (Exception e) {  
+	        	log.error(e);e.printStackTrace();
+	        	
+	        }finally {
+				try {
+					conn.close();
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
+			}  
+	         
+	        return total;  
+	}
+	
+	/**
+	 * 传入自定义的sql和参数数组
+	 * @param sql
+	 * @param params
+	 * @return
+	 */
+	public int queryCountByCustomSqlAndParams(String query, Object... params) {
+		 	int total = 0;  
+	        Connection conn = MyDataSource.getConnect();
+	        try {  
+	            Map<String, Object> map = (Map<String, Object>) queryRunner.query(conn, query, new MapHandler(), params);
+	            Set<Entry<String, Object>> set = map.entrySet();// 取得键值对的对象set集合
+	    		for (Entry<String, Object> en : set) {// 遍历键值对的集合
+	    			String n = en.getValue().toString();
+	    			total = Integer.parseInt(n); 
+	    		}
+	        } catch (Exception e) {  
+	        	log.error(e);e.printStackTrace();
+	        }finally {
+				try {
+					conn.close();
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
+			}  
+	        return total;  
+	}
+	
+	/**
+	 * 传入自定义的sql查询分页
+	 * @param sql
+	 * @return
+	 */
+    public <T> List<T> queryListByCustomSqlAndParams(Class<T> beanClass,String sql,Object... params){
+    	Connection conn = MyDataSource.getConnect();
+    	try{
+    		List<T> arrayList = queryRunner.query(conn,sql,new BeanListHandler<T>(beanClass),params);
+    		return arrayList;
+    	}catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException("分页查询异常");
+		}finally{
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+        }
+    }
+	
+	public int executeSQL(String sql) {
+		return executeSQL(sql,new Object[]{});
+	}
+	
+	public int excuteSqls(String[] sqls) {
+		int result = 0;
+		String[] zsqls = sqls;
+		try {
+			for(int i=0;i<zsqls.length;i++)
+			{
+				executeSQL(zsqls[i]);
+			}
+		} catch (Exception e) {
+			log.error(e);e.printStackTrace();
+		}
+		return result;
+	}
+	public int executeSQL(String sql, Object... params) {
+		Connection conn = MyDataSource.getConnect();
+		try {
+			if("1".equals(printSQL)){
+				System.out.println("<<<<<<<<<<<<<<<<<<<<<<<<<    "+StringUtil.replaceSql(new StringBuilder(sql), params,params == null ? 0 : params.length)+"     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+			}
+			return queryRunner.update(conn, sql, params);
+		} catch (SQLException e) {
+			log.error(e);e.printStackTrace();
+			return -1;
+		} finally {
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public int executeSQLWithConnection(Connection conn,String sql,Object... params){
+		try {
+			if("1".equals(printSQL)){
+				System.out.println("<<<<<<<<<<<<<<<<<<<<<<<<<    "+StringUtil.replaceSql(new StringBuilder(sql), params,params == null ? 0 : params.length)+"     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+			}
+			return queryRunner.update(conn, sql, params);
+		} catch (SQLException e) {
+			log.error(e);e.printStackTrace();
+			return -1;
+		} finally {
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public <T> String updateDataForKeys(Object bean,String pri_name){
+		String keys = "";
+		String getMethodName = "";
+		String setMethodName = "";
+		String sql = "";
+		String primaryKey = "";
+		SqlBuilder sb = new SqlBuilder();
+		if(!"".equals(pri_name)){
+			primaryKey = pri_name.substring(0, 1).toUpperCase()+ pri_name.substring(1);
+			getMethodName = "get" + primaryKey;
+			setMethodName = "set" + primaryKey;
+		}else{
+			getMethodName = "getRec_id";
+			setMethodName = "setRec_id";
+		}
+		
+		try {
+			Method method = bean.getClass().getMethod(getMethodName,new Class[] {});
+			Object value = method.invoke(bean, new Object[] {});
+			if (value == null || "".equals(value)) {
+				keys = StringUtil.generateSequenceNo();
+				Method method2 = bean.getClass().getMethod(setMethodName,new Class[] { String.class });  // 得到set方法
+				method2.invoke(bean, new Object[] { keys }); // 调用setXXXX方法
+				sql = sb.getInsertSQL(bean,tableName);
+			}else{
+				sql = sb.getUpdateSQL(bean,tableName,pri_name);
+				keys = StringUtil.objectToString(value);
+			}
+			Object[] params = sb.getParams();
+			executeSQL(sql,params);
+			if("1".equals(printSQL)){
+				System.out.println("<<<<<<<<<<<<<<<<<<<<<<<<<    "+StringUtil.replaceSql(new StringBuilder(sql), params,params == null ? 0 : params.length)+"     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+//				log.warn(StringUtil.replaceSql(new StringBuilder(sql), params,params == null ? 0 : params.length));
+			}
+		} catch (Exception e) {
+			log.error(e);e.printStackTrace();
+		} 
+		
+		return keys;
+	};
+	
+	public <T> String updateDataForKeys(Object bean){
+		return updateDataForKeys(bean,"");
+	};
+	
+	public <T> int updateData(Object bean,String pri_name){
+		int result = -1;
+		String getMethodName = "";
+		String setMethodName = "";
+		String sql = "";
+		String primaryKey = "";
+		SqlBuilder sb = new SqlBuilder();
+		if(!"".equals(pri_name)){
+			primaryKey = pri_name.substring(0, 1).toUpperCase()+ pri_name.substring(1);
+			getMethodName = "get" + primaryKey;
+			setMethodName = "set" + primaryKey;
+		}else{
+			getMethodName = "getRec_id";
+			setMethodName = "setRec_id";
+		}
+		
+		try {
+			Method method = bean.getClass().getMethod(getMethodName,new Class[] {});
+			Object value = method.invoke(bean, new Object[] {});
+			if (value == null || "".equals(value)) {
+				String idvalue = StringUtil.generateSequenceNo();
+				Method method2 = bean.getClass().getMethod(setMethodName,new Class[] { String.class }); // 得到set方法
+				method2.invoke(bean, new Object[] { idvalue }); // 调用setXXXX方法
+				sql = sb.getInsertSQL(bean,tableName);
+			}else{
+				sql = sb.getUpdateSQL(bean,tableName,pri_name);
+			}
+			Object[] params = sb.getParams();
+			result = executeSQL(sql,params);
+		} catch (Exception e) {
+			log.error(e);e.printStackTrace();
+		} 
+		
+		return result;
+	};
+	
+	public <T> int updateData(Connection conn,Object bean,String pri_name){
+		int result = -1;
+		String getMethodName = "";
+		String setMethodName = "";
+		String sql = "";
+		String primaryKey = "";
+		SqlBuilder sb = new SqlBuilder();
+		if(!"".equals(pri_name)){
+			primaryKey = pri_name.substring(0, 1).toUpperCase()+ pri_name.substring(1);
+			getMethodName = "get" + primaryKey;
+			setMethodName = "set" + primaryKey;
+		}else{
+			getMethodName = "getRec_id";
+			setMethodName = "setRec_id";
+		}
+		
+		try {
+			Method method = bean.getClass().getMethod(getMethodName,new Class[] {});
+			Object value = method.invoke(bean, new Object[] {});
+			if (value == null || "".equals(value)) {
+				String idvalue = StringUtil.generateSequenceNo();
+				Method method2 = bean.getClass().getMethod(setMethodName,new Class[] { String.class }); // 得到set方法
+				method2.invoke(bean, new Object[] { idvalue }); // 调用setXXXX方法
+				sql = sb.getInsertSQL(bean,tableName);
+			}else{
+				sql = sb.getUpdateSQL(bean,tableName,pri_name);
+			}
+			Object[] params = sb.getParams();
+			result = executeSQLWithConnection(conn,sql,params);
+		} catch (Exception e) {
+			log.error(e);e.printStackTrace();
+		} 
+		
+		return result;
+	};
+	
+	public <T> int updateData(Object bean){
+		return updateData(bean,"");
+	};
+	
+
+	public <T> int updateData(String table,Object bean){
+		tableName = table;
+		return updateData(bean,"");
+	};
+	public <T> int updateData(String table,Object bean,String pri_name){
+		tableName = table;
+		return updateData(bean,pri_name);
+	};
+	
+	public int[] batch(String sql, Object[][] params){
+		Connection conn = MyDataSource.getConnect();
+		try {
+			return queryRunner.batch(conn, sql, params);
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				log.error(e);e.printStackTrace();
+			}
+		}
+	};
+
+	public <T> int deleteByid(Class<T> beanClass, String idValue,String pri_name){
+		Connection conn = MyDataSource.getConnect();
+		try {
+			String sql="delete from "+ tableName + " where "+pri_name+" = ?";
+			queryRunner.update(conn,sql,idValue);
+			return 1;
+
+		} catch (SQLException e) {
+			return 0;
+		} finally {
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				log.error(e);e.printStackTrace();
+			}
+		}
+	} ;
+
+	public <T> T queryBeanById(Class<T> beanClass, String id,String pri_name){
+		Connection conn = MyDataSource.getConnect();
+		try {
+			String sql = "select * from " + tableName
+					+ " where "+pri_name+" = ?";
+			return (T) queryRunner.query(conn, sql,
+					isPrimitive(beanClass) ? new ScalarHandler<T>() {
+						@SuppressWarnings("unchecked")
+						public T handle(ResultSet rs) throws SQLException {
+							Object obj = super.handle(rs);
+							return (T)obj;
+						}
+					}
+							: new BeanHandler<T>(beanClass), id);
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				log.error(e);
+				e.printStackTrace();
+			}
+		}
+	};
+	
+	public <T> List<T> subList(List<T> list,int fromIndex,int toIndex){
+		List<T> newList = new ArrayList<T>();
+		List<T> subList = new ArrayList<T>();
+		if(list != null){
+			Iterator<T> itr = list.iterator();
+			while(itr.hasNext()){
+				T bean = itr.next();
+				newList.add(bean);
+			}
+			subList = newList.subList(fromIndex, toIndex);
+		}
+		
+		return subList;
+	}
+	
+	public Map<String, String> callProcedure(String sql, Object... params) {
+		Map<String, String> map = new HashMap<String, String>();
+		CallableStatement cs = null;
+		ResultSet rs = null;
+		Connection conn = null;
+		try {
+			conn = MyDataSource.getConnect();
+			cs = conn.prepareCall(sql);
+			// 设置输入参数
+			for (int i = 0; i < params.length; i++) {
+				cs.setObject(i + 1, params[i]);
+			}
+
+			// 设置输出参数
+			cs.registerOutParameter(8, Types.INTEGER);
+			cs.registerOutParameter(9, Types.INTEGER);
+			cs.registerOutParameter(10, Types.INTEGER);
+			cs.registerOutParameter(11, Types.INTEGER);
+			cs.registerOutParameter(12, Types.INTEGER);
+			cs.registerOutParameter(13, Types.INTEGER);
+			rs = cs.executeQuery();
+			while (rs.next()) {
+				map.put("visit_bouce_count", rs.getString("visit_bouce_count"));
+				map.put("page_count", rs.getString("page_count"));
+				map.put("page_bounce_count", rs.getString("page_bounce_count"));
+				map.put("play_bounce_count", rs.getString("play_bounce_count"));
+				map.put("visit_prog_count", rs.getString("visit_prog_count"));
+				map.put("visit_interval", rs.getString("visit_interval"));
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (rs != null) {
+					rs.close();
+				}
+				if (cs != null) {
+					cs.close();
+				}
+				if (conn != null) {
+					conn.close();
+				}
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
+		}
+		return map;
+	}
+}

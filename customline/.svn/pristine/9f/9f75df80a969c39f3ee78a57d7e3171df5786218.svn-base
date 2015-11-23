@@ -1,0 +1,21 @@
+.stationPicker{
+    width:300px;
+    margin-left:5px;
+    float:left;
+    border: 1px solid #b0c6d5;
+}
+
+.stationPicker div{
+    height:20px;
+    line-height:20px;
+    font-size:12px;
+    color:#666;
+    background:#fff;
+    margin:5px;
+    padding-left:5px;
+}
+
+.stationPicker div:hover{
+    background:#b0c6d5;
+    color:#fff;
+}

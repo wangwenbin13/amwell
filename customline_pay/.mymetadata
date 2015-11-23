@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-module
+  type="WEB"
+  name="AMWELL_MSG"
+  id="myeclipse.1406538604802"
+  context-root="/msg"
+  j2ee-spec="5.0"
+  archive="AMWELL_MSG.war">
+  <attributes>
+    <attribute name="webrootdir" value="/WebRoot" />
+  </attributes>
+</project-module>
+

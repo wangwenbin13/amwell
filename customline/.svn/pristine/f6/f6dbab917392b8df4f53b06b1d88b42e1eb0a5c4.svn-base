@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-module
+  type="WEB"
+  name="AMWELL_CUSTOMLINE"
+  id="myeclipse.1407146624256"
+  context-root="/customline"
+  j2ee-spec="5.0"
+  archive="AMWELL_CUSTOMLINE.war">
+  <attributes>
+    <attribute name="webrootdir" value="/WebRoot" />
+  </attributes>
+</project-module>
+

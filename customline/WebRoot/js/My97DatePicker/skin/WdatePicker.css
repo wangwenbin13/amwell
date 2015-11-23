@@ -1,0 +1,27 @@
+.Wdate{
+	height:22px;
+	background:#F3F9FD url(datePicker.png) no-repeat right;
+	border: 0px none;
+	}
+.Wdate75 {
+	width: 97%;
+	}
+
+.Wdate::-ms-clear{display:none;}
+
+.WdateFmtErr{
+	font-weight:bold;
+	color:red;
+	}
+.pop-main .Wdate,.no-timebg .Wdate{
+	background:#fff url(datePicker.png) no-repeat right;
+	}
+.no-timebg	.Wdate75 {
+	width: 98%;
+	}
+.pop-main.pop-driver .Wdate{
+	background:#F3F9FD url(datePicker.png) no-repeat right;
+	}
+.graybg .Wdate{
+	background:#F0F1F1 url(datePicker.png) no-repeat right;
+	}

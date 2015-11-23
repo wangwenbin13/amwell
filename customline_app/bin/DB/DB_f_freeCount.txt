@@ -1,0 +1,55 @@
+DELIMITER $$  
+
+/*
+**根据发车时间，发车日期，线路ID获取对车班次剩余座位数
+*/
+
+DROP FUNCTION IF EXISTS `f_getFreeSeatCount`$$
+
+CREATE FUNCTION f_getFreeSeatCount (Ctime VARCHAR(50),Cdate VARCHAR(50), Lid VARCHAR(50)) RETURNS  INT 
+
+DETERMINISTIC
+
+BEGIN  
+
+DECLARE cid VARCHAR(50) DEFAULT '';  -- 班次ID
+
+DECLARE buyCount INT DEFAULT 0; -- 已订座位数
+
+DECLARE totalCount INT DEFAULT 0;  -- 总座位数
+
+DECLARE totalCount_temp INT DEFAULT -1;  -- 总座位数(临时)
+
+DECLARE result INT DEFAULT -1; -- 座位剩余数 -1：无班次  0：已满  其他：剩余座位数
+
+SET cid = (SELECT lineClassId FROM line_class_info WHERE orderStartTime = Ctime AND orderDate = Cdate AND linebaseid = Lid  AND delflag = '0');  
+
+IF cid = '' || cid IS NULL THEN  
+
+SET result := result;  
+
+ELSE 
+
+SET totalCount_temp = (SELECT orderSeats FROM line_class_info WHERE lineClassId = cid AND delflag = '0');-- 获取当前线路总共多少个座位
+
+IF totalCount_temp <> '' && totalCount_temp IS NOT NULL THEN  
+
+SET totalCount := totalCount_temp; 
+
+ELSE
+
+RETURN result;
+
+END IF; 
+
+SET buyCount = (SELECT COUNT(tickets) AS useredSeat FROM line_business_order WHERE lineClassId = cid AND leaseOrderId IN (SELECT leaseOrderNo FROM lease_base_info WHERE 
+
+payStatus IN(0,1)));  -- 获取当前已经购买数量
+
+SET result = totalCount - buyCount;
+
+END IF;  
+
+RETURN result;  
+
+END $$ 

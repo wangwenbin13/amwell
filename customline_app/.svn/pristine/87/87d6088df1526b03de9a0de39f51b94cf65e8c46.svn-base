@@ -1,0 +1,27 @@
+package com.pig84.ab.vo.coupon;
+
+import java.util.Arrays;
+import java.util.List;
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * 电话号码规则
+ * @author gxt
+ *
+ */
+public class TelephoneRule extends Rule {
+
+	public TelephoneRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public PassengerInfo filter(Object obj,PassengerInfo passenger){
+		String[] strs=getTheValue().split(";");
+		List<String> telephoneList=Arrays.asList(strs);
+		if(telephoneList.contains(passenger.getTelephone())){//规则中的电话号码与用户电话号码相匹配
+			return passenger;
+		}
+		return null;
+	}
+}

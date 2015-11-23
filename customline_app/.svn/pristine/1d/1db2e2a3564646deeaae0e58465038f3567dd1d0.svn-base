@@ -1,0 +1,27 @@
+package com.pig84.ab.vo.coupon;
+
+import java.util.List;
+import com.pig84.ab.dao.ICouponRuleDao;
+import com.pig84.ab.vo.PassengerInfo;
+import com.pig84.ab.vo.bean.AppVo_1;
+
+/**
+ * 线路规则
+ * @author gxt
+ *
+ */
+public class LineRule extends Rule {
+	
+	private ICouponRuleDao couponRuleDao;
+
+	public LineRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public PassengerInfo filter(Object obj,PassengerInfo passenger){
+		this.couponRuleDao=(ICouponRuleDao)obj;
+		List<AppVo_1> voList=couponRuleDao.getLeaseBase(passenger.getPassengerId(),getTheValue());
+		return getResult(voList, passenger);
+	}
+}

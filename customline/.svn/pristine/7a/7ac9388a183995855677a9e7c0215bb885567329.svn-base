@@ -1,0 +1,120 @@
+#config`
+
+#Connect type,0:tomcat,1:weblogic
+connType = 0
+
+#Weblogic t3 Address
+t3 = t3://localhost:8080
+
+#DataBase type,0:mysql,1:Oracle
+dbType = 0
+
+#Memcached address
+memAddress = 127.0.0.1
+memPort = 11211
+
+memAddress1 = 127.0.0.1
+memPort1 = 11211
+
+#KindEditorServlet dir
+editorUpload = /data/webapp/uploads/
+
+#Is Print SQL,1:print,0:not print
+printSQL = 1
+
+#Web address
+webAddress = http://localhost:8080
+
+#sendMsg address(common)
+sendCommonMsg = http\://183.57.43.185\:39470/msg/msg/postSendMsg.action
+
+#sendMsg address
+sendMsg = http\://183.57.43.185\:39470/msg/msg/sendRegisterMsg.action
+
+#getMsg address
+getdMsg = http\://183.57.43.185\:39470/msg/msg/getRegisterMsg.action
+
+#Msg And antation Url
+jpushUrl=http://183.57.43.185:39270/customline_app/app_MsgTask/sendMsg.action
+
+#application open Url
+applicationOpenUrl = http://183.57.43.185:39270/customline_app/app_MsgTask/sendRelateMsg.action
+
+#Msg Count Url
+msgCountUrl=http://183.57.43.185:39470/msg/msg/getMsgCount.action
+
+
+#Domain flag,0:localhost,1:www
+domainFlag =0
+
+#other msg url
+http.root.phone.url = http\://183.57.43.185\:39470/msg/msg/postSendMsg.action
+
+#upload ftp server
+ftp.image.url=183.57.43.185
+ftp.image.port=39570
+ftp.image.username=ftpadmin
+ftp.image.password=Dec_ftp@pig,84&*();
+
+#upload root identify url
+ftp.image.root=busonline
+ftp.image.root.hpic=h_pic
+ftp.image.root.spic=s_pic
+ftp.image.root.opic=o_pic
+ftp.image.root.ad=ad_pic
+
+#APP message pic
+ftp.image.root.mpic=m_pic
+ftp.image.root.dingZhiBus=busonline
+ftp.image.root.customerIntroduce=customerIntroduce
+
+#image download http server
+http.root.url=http\://183.57.43.185\:39571
+
+#chinaPay config
+# merchant info
+chinapay.security.key=R841L63BQJyDsGgPvGmTNxHUOX5sKUPb
+chinapay.mer.id=880000000002393
+chinapay.mer.back.end.url=http\://183.57.43.185\:39270/customline/app_chinapay/monitorChinaPayResult.action
+chinapay.mer.front.end.url=http\://183.57.43.185\:39270/customline_app/app_pay/monitorChinaPayResult_pay.action
+# message info
+chinapay.version=1.0.0
+chinapay.charset=UTF-8
+chinapay.sign.method=MD5
+chinapay.time.timeout=30
+# server url
+chinapay.upmp.trade.url=http://202.101.25.178:8080/gateway/merchant/trade
+chinapay.upmp.query.url=http\://202.101.25.178\:8080/gateway/merchant/query
+
+#weixin push message url
+weixin.push.message.url=http://183.57.43.185:80/busOnline/sendPushMessageAction/sendBcLineMessage
+
+#http pic url ceshi
+http.pic.url=/home/ftptest/apache-tomcat-6.0.43/webapps/busonline/
+http.pic.ip=http://192.168.9.6:17530/
+http.pic.directory=busonline
+http.image.root.hpic=h_pic
+http.image.root.spic=s_pic
+http.image.root.ad=ad_pic
+http.image.root.mpic=m_pic
+http.image.root.dingZhiBus=busonline
+http.image.root.customerIntroduce=customerIntroduce
+
+#http pic url waiwang
+#http.pic.url=/web/amwell/ftp/apache-tomcat-6.0.43/webapps/busonline/
+#http.pic.ip=http://appftp.pig84.com/
+#http.pic.directory=busonline
+#http.image.root.hpic=h_pic
+#http.image.root.spic=s_pic
+#http.image.root.ad=ad_pic
+#http.image.root.mpic=m_pic
+#http.image.root.dingZhiBus=busonline
+#http.image.root.customerIntroduce=customerIntroduce
+
+#zfb return notify_url
+zfb.return.notify.url=http\://183.57.43.185\:39270/customline/zfbReturnTicket/zfbReturnMes.action
+
+
+#BUS POSITION API
+#bus.position.api=http://192.168.9.6:10054/customline_app/app_GPS/getBusPosition.action
+bus.position.api=http://bsapp.pig84.com/customline_app/app_GPS/getBusPosition.action

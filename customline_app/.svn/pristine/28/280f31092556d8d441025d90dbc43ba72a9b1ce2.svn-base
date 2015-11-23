@@ -1,0 +1,20 @@
+package com.pig84.ab.vo.coupon;
+
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * 是否被推荐规则
+ * @author gxt
+ *
+ */
+public class IsRecommendedRule extends Rule {
+	
+	public IsRecommendedRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public PassengerInfo filter(Object obj,PassengerInfo passenger)  {
+		return passenger;
+	}
+}

@@ -1,0 +1,51 @@
+package com.amwell.vo;
+
+/**IOS版本号VO
+ * @author Administrator
+ *
+ */
+public class IosVersionVo {
+	
+	private String version;
+	
+	private Integer appType;
+	
+	private Integer ismust;
+	
+	private String info;
+
+	public String getVersion() {
+		return version;
+	}
+
+	public void setVersion(String version) {
+		this.version = version;
+	}
+
+	public Integer getAppType() {
+		return appType;
+	}
+
+	public void setAppType(Integer appType) {
+		this.appType = appType;
+	}
+
+	public Integer getIsmust() {
+		return ismust;
+	}
+
+	public void setIsmust(Integer ismust) {
+		this.ismust = ismust;
+	}
+
+	public String getInfo() {
+		return info;
+	}
+
+	public void setInfo(String info) {
+		this.info = info;
+	}
+	
+	
+
+}

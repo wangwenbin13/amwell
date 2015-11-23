@@ -1,0 +1,181 @@
+package com.action;
+
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLEncoder;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+
+import com.bean.PayBean;
+import com.paypal.api.payments.Amount;
+import com.paypal.api.payments.Refund;
+import com.paypal.api.payments.Sale;
+import com.paypal.base.ConfigManager;
+import com.paypal.base.Constants;
+import com.paypal.base.rest.APIContext;
+import com.paypal.base.rest.OAuthTokenCredential;
+import com.paypal.base.rest.PayPalRESTException;
+import com.paypal.base.rest.PayPalResource;
+import com.utils.Bean;
+import com.utils.Http;
+import com.utils.Json;
+import com.utils.PropertyManage;
+
+/**
+ * paypal支付相关
+ * @author zhangqiang
+ * @time 2015-09-24 10:23:33
+ */
+@ParentPackage("no-interceptor")
+@Namespace("/paypal_pay")
+@SuppressWarnings("all")
+@ExceptionMappings( { @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class PayPalAction extends BaseAction {
+	
+	/**
+	 * PayPal订单
+	 * @param orderNo 商品订单号
+	 * @return 商品价格
+	 * @throws IOException 
+	 */
+	@Action(value = "bulidPayPalOrder", results = { @Result(type = "json") })
+	public String bulidPayPalOrder() throws IOException{
+		String orderNo = request.getParameter("orderNo"); //商品订单号
+		String orderInfoUrl = PropertyManage.get("ORDER_INFO_URL");//获取商品详细地址
+		String resp = Http.post(orderInfoUrl, "orderNo",orderNo);
+		Bean vo = new Bean();
+		//商品信息有误
+		if(StringUtils.isEmpty(orderNo) || StringUtils.isEmpty(resp)){
+			vo.setResult("-1");
+			write(vo);
+			return null;
+		}
+		
+		PayBean bean = new PayBean();
+		bean = Json.fromJson(resp, PayBean.class);
+		vo.setResult(bean.getPrice());
+		write(vo);
+		return null;
+	}
+	
+	/**
+	 * PayPal 支付回调地址（第三方回调）
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "PayPalReturnUrl", results = { @Result(type = "json") })
+	public String PayPalReturnUrl() throws IOException{
+		try {
+			Enumeration en = request.getParameterNames();
+			String str = "cmd=_notify-validate";
+			while (en.hasMoreElements()) {
+				String paramName = (String) en.nextElement();
+				String paramValue = request.getParameter(paramName);
+				str = str + "&" + paramName + "="+ URLEncoder.encode(paramValue, "utf-8");
+				// 此处的编码一定要和自己的网站编码一致，不然会出现乱码，paypal回复的通知为‘INVALID’
+			}
+			String url = PropertyManage.get("paypal.conform");
+			URL u = new URL(url);
+			URLConnection uc = u.openConnection();
+			uc.setDoOutput(true);
+			uc.setRequestProperty("Content-Type","application/x-www-form-urlencoded");
+			PrintWriter pw = new PrintWriter(uc.getOutputStream());
+			pw.println(str);
+			pw.close();
+			// 接受 PayPal 对 IPN 回发的回复信息
+			BufferedReader in = new BufferedReader(new InputStreamReader(uc.getInputStream()));
+			String res = in.readLine();
+			in.close();
+			String orderInfoUrl = PropertyManage.get("Notice_Merchant_Url");//商户支付通知地址
+			String paymentAmount = request.getParameter("mc_gross");// 交易钱数
+			String txnId = request.getParameter("txn_id");// 交易id
+			String custom = request.getParameter("custom");// 我们的订单号
+			String ack = "None";
+			Map<String,String> args = new HashMap<>();
+			args.put("orderNo",custom);
+			args.put("tradeOrderNo", txnId);
+			args.put("fee", paymentAmount);
+			args.put("payModel", "3");//PayPal支付
+			
+			if (res == null || res == "")
+				res = "0";
+			// 获取 PayPal 对回发信息的回复信息，判断刚才的通知是否为 PayPal 发出的
+			if (res.equals("VERIFIED")) {
+				args.put("tradeType", "1");//成功
+				ack = "VERIFIED";
+			} else if (res.equals("INVALID")) {
+				// 非法信息，可以将此记录到您的日志文件中以备调查
+				args.put("tradeType", "2");//失败
+				ack = "INVALID";
+			} else {
+				// 处理其他错误
+				ack = "OTHER";
+				args.put("tradeType", "2");//失败
+			}
+			Http.post(orderInfoUrl, args);//通知商户支付结果
+		} catch (Exception e) {
+		}
+		return null;
+	}
+	
+	/**
+	 * PayPal 退货地址
+	 * @param Thirdparty 第三方交易号
+	 * @param price 价格
+	 * @param orderNo 商户订单号（暂无用到）
+	 * @return 0:失败  1:成功
+	 */
+	@Action(value = "PayPalReturnOrder", results = { @Result(type = "json") })
+	public String PayPalReturnOrder(){
+		String Thirdparty = request.getParameter("Thirdparty");//第三方交易号
+		String price = request.getParameter("price");//价格
+		String orderNo = request.getParameter("orderNo");//商户订单号（暂无用到）
+		InputStream is = PayPalAction.class.getClassLoader().getResourceAsStream("paypal_config.properties");
+		String result = "0";//失败
+		try {
+			PayPalResource.initConfig(is);
+		} catch (PayPalRESTException e) {
+			result = "0";//失败
+		}
+		Sale sale = new Sale();
+		sale.setId(Thirdparty);
+		Refund refund = new Refund();
+		Amount amount = new Amount();
+		amount.setCurrency("SGD");
+		amount.setTotal(price);
+		refund.setAmount(amount);
+		try {
+			String accessToken = getAccessToken();
+			APIContext apiContext = new APIContext(accessToken);
+			sale.refund(apiContext, refund);
+			String request = Sale.getLastRequest();
+			String response = Sale.getLastResponse();
+		} catch (PayPalRESTException e) {
+			result = "0";//失败
+		}
+		result = "1";//成功
+		write(result);
+		return null;
+	}
+	
+	private static String getAccessToken() throws PayPalRESTException {
+		String clientID = ConfigManager.getInstance().getValue(Constants.CLIENT_ID);
+		String clientSecret = ConfigManager.getInstance().getValue(Constants.CLIENT_SECRET);
+		return new OAuthTokenCredential(clientID, clientSecret).getAccessToken();
+	}
+}

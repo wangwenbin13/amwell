@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE struts PUBLIC "-//Apache Software Foundation//DTD Struts Configuration 2.1//EN" "http://struts.apache.org/dtds/struts-2.1.dtd">
+<struts>
+	<constant name="struts.i18n.encoding" value="UTF-8"/>
+	
+    <package name="no-interceptor" extends="struts-default,json-default" namespace="/">
+		<interceptors>
+			<interceptor-stack name="default-with-my-inteceptor">
+				<interceptor-ref name="defaultStack" />
+				<interceptor-ref name="exception-interceptor" />
+			</interceptor-stack>
+			<interceptor name="exception-interceptor" class="com.pig84.ab.utils.ExceptionInterceptor" /> 
+		</interceptors>
+		<default-interceptor-ref name="default-with-my-inteceptor" />
+	</package>
+
+</struts>    

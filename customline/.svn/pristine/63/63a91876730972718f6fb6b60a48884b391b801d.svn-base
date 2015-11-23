@@ -1,0 +1,62 @@
+package com.amwell.commons;
+
+import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.log4j.Logger;
+
+/**
+ * Short Message.
+ * 
+ * @author GuoLin
+ *
+ */
+public class Message {
+	
+	private static final Logger logger = Logger.getLogger(Message.class);
+	
+	private static final String URL_SEND = PropertyManage.getInfoProperty("pns.sms.send");
+
+	private static final String URL_BALANCE = PropertyManage.getInfoProperty("pns.sms.balance");
+	
+	private final String content;
+	
+	public Message(String content, Object... args) {
+		this.content = String.format(content, args);
+	}
+	
+	public void sendTo(String... mobiles) {
+		sendTo(null, mobiles);
+	}
+	
+	public void sendTo(Provider provider, String... mobiles) {
+		String url = provider == null ? URL_SEND : (URL_SEND + "/" + provider);
+		String mobileText = String.join(",", mobiles);
+		if (logger.isInfoEnabled()) {
+			logger.info("Sending message to " + mobileText + " : '" + content + "'");
+		}
+		PostHttpClient.post(url, "content", content, "mobile", mobileText);  // We don't care whether message is successful
+	}
+	
+	public static int balance(Provider provider) {
+		String res = HttpRequestUtils.sendGetRequest(String.format(URL_BALANCE, provider));
+		return NumberUtils.toInt(res);
+	}
+	
+	public static enum Provider {
+		
+		GUODU,
+		
+		YIMEI,
+		
+		CHUANGLAN;
+		
+		public static Provider from(String name) {
+			if (name == null) {
+				return Provider.GUODU;
+			}
+			Provider provider = Provider.valueOf(name.toUpperCase());
+			return provider != null ? provider : Provider.GUODU;
+		}
+
+	}
+	
+}

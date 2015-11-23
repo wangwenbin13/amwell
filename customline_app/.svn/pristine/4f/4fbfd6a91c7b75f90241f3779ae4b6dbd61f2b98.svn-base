@@ -1,0 +1,224 @@
+package com.pig84.ab.action;
+
+import java.io.IOException;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.pig84.ab.cache.UserCache;
+import com.pig84.ab.dao.impl.RePeat;
+import com.pig84.ab.service.IBookService;
+import com.pig84.ab.service.ITicketService;
+import com.pig84.ab.utils.CacheUtil;
+import com.pig84.ab.utils.Json;
+import com.pig84.ab.utils.MyDate;
+import com.pig84.ab.utils.PropertyManage;
+import com.pig84.ab.vo.QueryTicketResult;
+import com.pig84.ab.vo.User;
+import com.pig84.ab.vo.bean.AppVo_14;
+import com.pig84.ab.vo.bean.AppVo_15_list;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_6;
+import com.pig84.ab.vo.bean.AppVo_7;
+
+/**
+ * 
+ * @author wangwenbin
+ *
+ */
+/**
+ * 车票相关
+ */
+@ParentPackage("no-interceptor")
+@Namespace("/app_ticket")
+@SuppressWarnings("all")
+@ExceptionMappings( { @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class TicketAction extends BaseAction{
+
+	@Autowired
+	private ITicketService ticketService;
+	
+	@Autowired
+	private IBookService bookService;
+	
+	/**
+	 * 车票列表
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "queryTicketList",results={@Result(type="json")})
+	public String ticketList() throws IOException{
+		String pageSize = request.getParameter("pageSize");//每页显示条数
+		String currentPage = request.getParameter("currentPage");//当前页数
+		String uid = request.getParameter("uid");//微信传过来的标识--用户ID
+		
+		QueryTicketResult queryTicketResult = new QueryTicketResult();
+		
+		User appUser = null;
+		if(!StringUtils.isEmpty(uid)){
+			appUser = new User();
+			appUser.setPassengerId(uid);
+		}else{
+			appUser = UserCache.getUser();//当前登录用户信息
+		}
+		
+		if(null==appUser || StringUtils.isEmpty(appUser.getPassengerId())){
+			queryTicketResult.setA1("0");//没有登陆
+		}else{
+			if(StringUtils.isEmpty(pageSize)){
+				pageSize = "30";
+			}
+			if(StringUtils.isEmpty(currentPage)){
+				currentPage = "0";
+			}
+			queryTicketResult = ticketService.queryTicketList(Integer.parseInt(pageSize),Integer.parseInt(currentPage),appUser.getPassengerId());
+			queryTicketResult.setA1("1");
+		}
+		write(queryTicketResult);
+		return null;
+	}
+	
+	/**
+	 * 改签详情(2.1)
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "changeTicketDetail_V2_1",results={@Result(type="json")})
+	public String changeTicketDetail_V2_1() throws IOException{
+		String localId = request.getParameter("localId"); //座位主键ID
+		AppVo_15_list  vo = new AppVo_15_list();
+		String orderNo = request.getParameter("orderNo");//订单号
+		User appUser = UserCache.getUser();//当前登录用户信息
+		String userid = "";
+		if(appUser!=null){
+			if(!StringUtils.isEmpty(localId)){
+				userid =  appUser.getPassengerId();
+				vo = bookService.changeOrReturn(orderNo,userid,1);
+				if(null==vo){
+					vo = new AppVo_15_list();
+					vo.setA1("1");//数据有误
+				}else {
+					List<AppVo_6> list = bookService.changeTicketDetail_V2_1(localId);
+					vo.setList(list);
+				}
+			}else{
+				vo.setA1("1");//数据有误
+			}
+		}else{
+			vo.setA1("2");//未登录
+		}
+		write(vo);
+		return null;
+	}
+	
+	/**
+	 * 退票详情(2.1)
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "returnTicketDetail_V2_1",results={@Result(type="json")})
+	public String returnTicketDetail_V2_1() throws IOException{
+		AppVo_15_list vo = new AppVo_15_list();
+		String orderNo = request.getParameter("orderNo");//订单号
+		String localId = request.getParameter("localId"); //座位主键ID
+		User appUser = UserCache.getUser();//当前登录用户信息
+		String userid = "";
+		if(null!=appUser && !StringUtils.isEmpty(appUser.getPassengerId())){
+			if(!StringUtils.isEmpty(localId)){
+				String price = request.getParameter("price");//金额eg:1.0,2.0,3.0
+				Integer percent = bookService.queryReturnPercent();//获取退票的手续费的百分比:eg:10(百分之10)
+				AppVo_5 vo5 = RePeat.countTickertMoney(price,percent);
+				vo5.setA4(appUser.getPassengerId());
+				CacheUtil.setCache("returnTicketCount_vo"+appUser.getPassengerId(), Json.toJson(vo5), 1800);
+				vo = bookService.changeOrReturn(orderNo,userid,2);
+				if(null==vo){
+					vo=new AppVo_15_list();
+				}
+				vo.setA6(vo5.getA1());//实付金额
+				vo.setA7(vo5.getA2());//手续费率
+				vo.setA8(vo5.getA3());//退款金额
+				List<AppVo_7> list = bookService.returnTicketDetail_V2_1(localId);
+				if(list == null || list.size()==0){
+					vo.setA1("1");//数据有误
+				}else{
+					vo.setList(list);
+				}
+			}else{
+				vo.setA1("1");//数据有误
+			}
+		}else{
+			vo.setA1("-1");//没有登录
+		}
+		write(vo);
+		return null;
+	}
+	
+	/**
+	 *  展示电子票（v2.3）
+	 * @return
+	 */
+	@Action(value = "showTicket_V2_3",results={@Result(type="json")})
+	public String showTicket_V2_3(){
+		String leaseOrderNo = request.getParameter("leaseOrderNo");//订单号
+		String cid = request.getParameter("cid");//班次ID
+		String uid = request.getParameter("uid");//微信传过来的标识--用户ID
+		User appUser = UserCache.getUser();
+
+		AppVo_14 vo = new AppVo_14();
+		if(appUser!=null){
+			uid = appUser.getPassengerId();
+		}
+		
+		if(uid!=null && !"".equals(uid)){
+			vo = ticketService.showTicket_V2_3(leaseOrderNo,uid,cid);
+			if(vo==null){
+				vo = new AppVo_14();
+			}else{
+				String checkTicketSTime = PropertyManage.get("init.checkTicketSTime");//前延时间（分钟）
+				String checkTicketETime = PropertyManage.get("init.checkTicketETime");//后延时间（分钟）
+				
+				String nowTime = MyDate.Format.DATETIME.now();//当前系统时间
+				String orderTime = vo.getA10()+" "+vo.getA9()+":00";//发车时间
+				String stime = MyDate.addTimeByMin(orderTime, -Integer.valueOf(checkTicketSTime==null?"0":checkTicketSTime));
+				String etime = MyDate.addTimeByMin(orderTime, Integer.valueOf(checkTicketETime==null?"0":checkTicketETime)+120);//默认往后延长2时间
+				if(MyDate.compare_date_time(nowTime, stime)==1 && MyDate.compare_date_time(nowTime, etime)==-1 &&!"4".equals(vo.getA4())){
+					vo.setA12(RSHash(vo.getA9()+vo.getA10()+vo.getA11()));//车票颜色
+				}else{
+					vo.setA12("");
+				}
+			}
+			vo.setA1("1");//已经登录
+		}else{
+			vo.setA1("0");//未登录
+		}
+		write(vo);
+		return null;
+	}
+	
+	
+	/**
+	 * 获取电子票颜色
+	 * @param str
+	 * @return
+	 */
+	private static String RSHash(String str) {
+		int b = 378551;
+		int a = 63689;
+		int hash = 0;
+		for (int i = 0; i < str.length(); i++) {
+			hash = hash * a + str.charAt(i);
+			a = a * b;
+		}
+		String color = PropertyManage.get("tichetColor");
+		int count = (color.split(",")).length;
+		int index = Math.abs(hash % count);
+		return color.split(",")[index];
+	}
+}

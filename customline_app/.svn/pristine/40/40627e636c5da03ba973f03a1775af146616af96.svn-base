@@ -1,0 +1,30 @@
+package com.pig84.ab.vo.coupon;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * 城市规则
+ * @author gxt
+ *
+ */
+public class CityRule extends Rule {
+
+	public CityRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public List<PassengerInfo> filter(Object obj,List<PassengerInfo> passengers) {
+		List<PassengerInfo> list=new ArrayList<PassengerInfo>();
+		for (PassengerInfo passenger : passengers) {
+			if ("equal".equals(getTheCondition()) && getTheValue().equals(passenger.getCityCode()) || 
+					"notEq".equals(getTheCondition()) && !getTheValue().equals(passenger.getCityCode())) {//规则中的城市与用户所属城市相匹配
+				list.add(passenger);
+			}
+		}
+		return list;
+	}
+}

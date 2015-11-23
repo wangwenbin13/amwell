@@ -1,0 +1,29 @@
+package com.pig84.ab.vo.coupon;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * 用户来源规则
+ * @author gxt
+ *
+ */
+public class SourceFromRule extends Rule {
+
+	public SourceFromRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public List<PassengerInfo> filter(Object obj,List<PassengerInfo> passengers) {
+		List<PassengerInfo> list=new ArrayList<PassengerInfo>();
+		for (PassengerInfo passenger : passengers) {
+			if(getTheValue().equals(passenger.getSourcefrom())){//规则中的用户来源与用户来源相匹配
+				list.add(passenger);
+			}
+		}
+		return list;
+	}
+}

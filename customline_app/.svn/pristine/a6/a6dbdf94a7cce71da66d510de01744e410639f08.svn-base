@@ -1,0 +1,46 @@
+package com.pig84.ab.vo;
+
+/**
+ * LeasePay entity. @author MyEclipse Persistence Tools
+ */
+
+public class LeasePay implements java.io.Serializable {
+
+
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -1271733304993232415L;
+	private String payId;
+	private String payModel;
+	private String payMoney;
+	private String leaseOrderNo;
+	
+	public String getPayId() {
+		return payId;
+	}
+	public void setPayId(String payId) {
+		this.payId = payId;
+	}
+	public String getPayModel() {
+		return payModel;
+	}
+	public void setPayModel(String payModel) {
+		this.payModel = payModel;
+	}
+	public String getPayMoney() {
+		return payMoney;
+	}
+	public void setPayMoney(String payMoney) {
+		this.payMoney = payMoney;
+	}
+	public String getLeaseOrderNo() {
+		return leaseOrderNo;
+	}
+	public void setLeaseOrderNo(String leaseOrderNo) {
+		this.leaseOrderNo = leaseOrderNo;
+	}
+	
+	
+
+}

@@ -1,0 +1,39 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP FUNCTION IF EXISTS `f_getDateByOrderNo`$$
+
+CREATE DEFINER=`root`@`localhost` FUNCTION `f_getDateByOrderNo`(passengerId VARCHAR(50),Ctime VARCHAR(50),orderNo VARCHAR(50)) RETURNS TEXT CHARSET utf8
+    DETERMINISTIC
+BEGIN  
+DECLARE result TEXT DEFAULT ''; -- 返回结果
+DECLARE v_date VARCHAR(50) DEFAULT ''; -- 临时日期
+	-- 定义游标结束标识
+	DECLARE STOP INT DEFAULT 0;
+	
+	DECLARE cur CURSOR FOR (SELECT b.orderDate FROM line_business_order a  LEFT JOIN line_class_info b ON a.lineclassid = b.lineclassid WHERE a.leaseorderid = orderNo AND b.orderStartTime = Ctime AND a.passengerId = passengerId AND CONCAT(b.orderDate,' ',b.orderStartTime)>NOW() ORDER BY b.orderDate);
+	
+	-- 声明游标的异常处理，设置一个终止标记 
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP = 1; 
+	
+	-- 打开游标
+	OPEN cur;
+	
+	FETCH cur INTO v_date;
+	
+	 WHILE STOP <> 1 DO
+		
+	    SET result := CONCAT(result,',',v_date);
+	
+	    FETCH cur INTO v_date;
+	     
+        END WHILE;
+        
+        -- 关闭游标
+        CLOSE cur;             
+		
+RETURN SUBSTRING(result, 2,LENGTH(result));
+END$$
+
+DELIMITER ;

@@ -1,0 +1,467 @@
+package com.amwell.dao.impl;
+
+import java.io.IOException;
+import java.sql.Connection;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.dbutils.QueryRunner;
+import org.springframework.stereotype.Repository;
+
+import com.amwell.base.DaoSupport;
+import com.amwell.commons.MyDataSource;
+import com.amwell.commons.MyDate;
+import com.amwell.commons.StringUtil;
+import com.amwell.dao.IAppSettingDao;
+import com.amwell.entity.Page;
+import com.amwell.vo.AppSettingVo;
+import com.amwell.vo.AppVersionVo;
+import com.amwell.vo.IosVersionVo;
+import com.amwell.vo.bc.BcTimeSetVo;
+
+/**
+ * 添加或修改APP设置
+ * @author Administrator
+ *
+ */
+@Repository("appSettingDao")
+public class AppSettingDaoImpl extends DaoSupport implements IAppSettingDao{
+	
+	
+
+
+	/**
+	 * 根据当前登录用户获取对应的app设置
+	 */
+	public AppSettingVo getAppSettingByCreateId(String userId) {
+		super.finit("sys_app_setting");
+		String sql="select * from sys_app_setting";
+		AppSettingVo appSettingVo=tableDao.queryBean(AppSettingVo.class, sql);
+		return appSettingVo;
+	}
+	
+	
+
+	/**
+	 * 修改APP设置
+	 * @author Administrator
+	 *
+	 */
+	public int updateAppCount(AppSettingVo appSettingVo) {
+		int flag = -1;
+		Connection conn = MyDataSource.getConnect();
+		if(conn==null){
+			throw new IllegalStateException("connection is null");
+		}
+		if(appSettingVo==null){
+			throw new IllegalArgumentException("appSettingVo is null");
+		}
+		try {
+			conn.setAutoCommit(false);
+			QueryRunner qr = new QueryRunner();
+			String appSetSql="UPDATE sys_app_setting SET orderValiteTime = ?,maxBusScope = ?,maxPcScope = ?,returnTicketFree = ?,updateBy = ?,updateOn = ?,createBy = ?,createOn=?,WXreply=?,delayTime = ? WHERE settingId = '1'";
+			String appSendType = "UPDATE  sys_app_send SET sendType = ? WHERE id='1'";
+			String bcSetSql = "update bc_set set paraValue = ? where set_id = '1' ";
+			qr.update(conn, appSetSql, new Object[]{appSettingVo.getOrderValiteTime(),appSettingVo.getMaxBusScope(),appSettingVo.getMaxPcScope(),appSettingVo.getReturnTicketFree(),appSettingVo.getCreateBy(),MyDate.getMyDate(),appSettingVo.getCreateBy(),MyDate.getMyDate(),appSettingVo.getWXreply(),appSettingVo.getDelayTime()});
+			qr.update(conn, appSendType, new Object[]{appSettingVo.getSendType()});
+			qr.update(conn, bcSetSql, new Object[]{appSettingVo.getBcTime()});
+			conn.commit();
+			flag=1;
+			AppendLog(appSettingVo.getCreateBy(), "APP设置", "修改成功");
+		} catch (Exception e) {
+			AppendLog(appSettingVo.getCreateBy(), "APP设置", "修改失败");
+			flag=-99;
+			e.printStackTrace();
+			if(conn !=null){
+				try {
+					conn.rollback();
+				} catch (Exception e2) {
+				}
+			}
+		}finally{
+			try {
+				conn.close();
+			} catch (Exception e2) {
+			}
+		}
+		return flag;
+	}
+
+
+	/* 
+	 * 查询app相关设置
+	 */
+	public AppSettingVo getAppSet() {
+		super.finit("sys_app_setting");
+		String sql = "select * from sys_app_setting where settingId = '1' ";
+		int count = super.tableDao.queryCount(sql);
+		if(count == 0){
+			return null;
+		}
+		AppSettingVo model = super.tableDao.queryBean(AppSettingVo.class, sql);
+		return model;
+	}
+
+	/* 
+	 * 查询订单时间延迟设置
+	 */
+//	public AppSettingVo getDelay() {
+//		super.finit("sys_order_delay");
+//		String sql = "select * from sys_order_delay where settingId = '1' ";
+//		int count = super.tableDao.queryCount(sql);
+//		if(count == 0){
+//			return null;
+//		}
+//		AppSettingVo model = super.tableDao.queryBean(AppSettingVo.class, sql);
+//		return model;
+//	}
+
+	/* 
+	 * 查询验证码发送方式
+	 */
+	public AppSettingVo getAppSend() {
+		super.finit("sys_app_send");
+		String sql = "select * from sys_app_send where id = '1' ";
+		int count = super.tableDao.queryCount(sql);
+		if(count == 0){
+			return null;
+		}
+		AppSettingVo model = super.tableDao.queryBean(AppSettingVo.class, sql);
+		return model;
+	}
+
+	/* 
+	 * 查询包车参数设置表
+	 */
+	public BcTimeSetVo getBcTime() {
+		super.finit("bc_set");
+		String sql = "select * from bc_set where set_id = '1' ";
+		int count = super.tableDao.queryCount(sql);
+		if(count == 0){
+			return null;
+		}
+		BcTimeSetVo model = super.tableDao.queryBean(BcTimeSetVo.class, sql);
+		return model;
+	}
+
+
+
+	/**
+	 * 第一次登录系统没数据时，添加第一条数据
+	 * @author Administrator
+	 *
+	 */
+	public int addAppSet(int i) {
+		Connection conn = MyDataSource.getConnect();
+		int flag=0;
+		try {
+			conn.setAutoCommit(false);
+			QueryRunner qr = new QueryRunner();
+			String sql="";
+			if(i==1){
+				sql = "INSERT INTO sys_app_setting (settingId,orderValiteTime,maxTickets,maxDays,maxMonths,createBy,createOn,updateBy,updateOn,maxBusScope,maxPcScope,WXreply,) VALUES ('1','30','1','1','1','','','','','2000','2000','')";
+			}else if(i==2){
+				sql ="INSERT INTO sys_app_send (id,sendType) VALUES ('1','1')";
+			}else if(i==4){
+				sql = "INSERT INTO bc_set (set_id,paraName,paraValue,remark) VALUES ('1',' ','48','用于设置包车线路的过期时间，时间起点以线路创建时间为准，时间单位为小时')";
+			}
+			flag=qr.update(conn, sql);
+			
+			conn.commit();
+		} catch (Exception e) {
+			flag=-99;
+			e.printStackTrace();
+			if(conn!=null){
+				try {
+					conn.rollback();
+				} catch (Exception e2) {
+				}
+			}
+		}finally{
+			try {
+				conn.close();
+			} catch (Exception e2) {
+			}
+		}
+		return flag;
+	}
+
+
+	/**
+	 * 修改短信服务商
+	 */
+	public int checkMsgBus(int i) {
+		Connection conn = MyDataSource.getConnect();
+		try {
+			conn.setAutoCommit(false);
+			QueryRunner qr = new QueryRunner();
+			String sql = "UPDATE sys_app_send SET business=? WHERE id=1";
+			qr.update(conn, sql, new Object[]{i});
+			conn.commit();
+		} catch (Exception e) {
+			e.printStackTrace();
+			if(conn!=null){
+				try {
+					conn.rollback();
+				} catch (Exception e2) {
+				}
+			}
+		}finally{
+			try {
+				conn.close();
+			} catch (Exception e2) {
+			}
+		}
+		return i;
+	}
+
+
+	/**查找最新的版本号
+	 * @return
+	 */
+	public String getNewVsn() {
+		super.finit("app_version");
+		String appSql1 = "SELECT * FROM app_version WHERE TYPE = '0' and state='0' and appType='1' ORDER BY flag DESC LIMIT 0,1 ";
+		AppVersionVo appVo1 = super.tableDao.queryBean(AppVersionVo.class, appSql1);
+		
+		String appSql2 = "SELECT * FROM app_version WHERE TYPE = '0' and state='0' and appType='2' ORDER BY flag DESC LIMIT 0,1 ";
+		AppVersionVo appVo2 = super.tableDao.queryBean(AppVersionVo.class, appSql2);
+		
+		super.finit("ios_version");
+		String iosSql1 = "SELECT * FROM ios_version WHERE 1=1 AND state='0' AND appType='1' ORDER BY flag DESC LIMIT 0,1 ";
+		IosVersionVo iosVo1 = super.tableDao.queryBean(IosVersionVo.class, iosSql1);
+		
+		String iosSql2 = "SELECT * FROM ios_version WHERE 1=1 AND state='0' AND appType='2' ORDER BY flag DESC LIMIT 0,1 ";
+		IosVersionVo iosVo2 = super.tableDao.queryBean(IosVersionVo.class, iosSql2);
+		
+		String vsn=null;
+		if(appVo1!=null  ){
+			vsn = appVo1.getVsn()+"/"+appVo1.getFlag();
+			if(appVo2!=null){
+				vsn += "/"+appVo2.getVsn()+"/"+appVo2.getFlag();
+			}else{
+				vsn += "/0"+"/"+"0";
+			}
+			if(iosVo1!=null ){
+				vsn+="/"+iosVo1.getVersion();
+				if(iosVo2!=null){
+					vsn+="/"+iosVo2.getVersion();
+				}else{
+					vsn += "/0";
+				}
+			}
+		}
+		
+		return vsn;
+	}
+
+
+	/**查询app最大版本号
+	 * @param appVsn
+	 * @param appUserType
+	 * @return
+	 */
+	public AppVersionVo getAppVesion( String appUserType) {
+		super.finit("app_version");
+		AppVersionVo appVo = new AppVersionVo();
+		if("".equals(appUserType)){
+			String appSql = "SELECT MAX(CAST(appId AS SIGNED INTEGER)) AS appId FROM app_version";
+			appVo = super.tableDao.queryBean(AppVersionVo.class, appSql);
+		}else{
+			String appSql = "SELECT * FROM app_version WHERE appType=? AND flag=(SELECT MAX(flag) FROM app_version WHERE appType=? and state = '0') and state = '0'";
+			appVo = super.tableDao.queryBean(AppVersionVo.class, appSql, new Object[]{appUserType,appUserType});
+		}
+		return appVo;
+	}
+
+
+	/**录入新版本信息(android)
+	 * @param vo 
+	 * @return
+	 */
+	public int addAppVsn(AppVersionVo vo) {
+		super.finit("app_version");
+		String vsnSql="select * from app_version where appType = ? and flag = ? and state =0 and type = 0";
+		int count = super.tableDao.queryCount(vsnSql,new Object[]{vo.getAppType(),vo.getFlag()});
+		String sql = "INSERT INTO app_version VALUES(?,?,?,?,?,?,?,?,?,?)";
+		args = new Object[10];
+		args[0] = vo.getAppId();
+		args[1] = vo.getVsn();
+		args[2] = vo.getType();
+		args[3] = vo.getUrl();
+		args[4] = vo.getVtime();
+		args[5] = vo.getFlag();
+		args[6] = vo.getIsmust();
+		args[7] = vo.getInfo();
+		args[8] = vo.getAppType();
+		args[9] = "0";
+		int flag=0;
+		if(count>0){
+			flag = super.tableDao.updateData(vo, vo.getVsn());
+		}else {
+			flag = super.tableDao.executeSQL(sql, args);
+		}
+		return flag;
+	}
+
+
+
+	
+	/* 
+	 * 录入新版本信息(ios)
+	 */
+	public int addIosVsn(IosVersionVo vo) {
+		super.finit("ios_version");
+		int flag=0;
+		String sql = "select * from ios_version where appType = ? and flag = ? and state = ? ";
+		int count = super.tableDao.queryCount(sql, new Object[]{vo.getAppType(),vo.getFlag(),0});
+		String iosId = StringUtil.generateSequenceNo();
+		args = new Object[9];
+		args[0] = iosId;
+		args[1] = vo.getVersion();
+		args[2] = vo.getAppType();
+		args[3] = vo.getIsmust();
+		args[4] = vo.getInfo();
+		args[5] = vo.getUrl();
+		args[6] = vo.getVtime();
+		args[7] = vo.getFlag();
+		args[8] = "0";
+		if(count>0){
+			flag=super.tableDao.updateData(vo,"flag");
+		}else{
+			String newSql = "insert into ios_version values(?,?,?,?,?,?,?,?,?)";
+			flag= super.tableDao.executeSQL(newSql, args);
+		}
+		return flag;
+	}
+
+
+	/**查询版本号是否最大值
+	 * @param vsnList 
+	 * @return
+	 */
+	public AppVersionVo queryVsn(String vsn,int i, String flag) {
+		super.finit("app_version");
+		AppVersionVo vo = new AppVersionVo();
+		String vsnSql ="select * from app_version where vsn = ? and appType=? and type=0 and state=0 ";
+		String flagSql ="select * from app_version where flag = ? and appType=? and type=0 and state=0 ";
+		vo = super.tableDao.queryBean(AppVersionVo.class, vsnSql,new Object[]{vsn,i});
+		if(vo==null || "".equals(vo)){
+			vo = super.tableDao.queryBean(AppVersionVo.class, flagSql,new Object[]{flag,i});
+		}
+		return vo;
+	}
+
+
+
+	/**
+	 * 查询版本号是否最大值(IOS)
+	 * @return
+	 */
+	public int queryIosVsn(String appType, String version,String flag) {
+		super.finit("ios_version");
+		int result=0;
+		String sql = "SELECT * FROM `ios_version` WHERE version =? AND appType = ? and state=0 ";
+		result = super.tableDao.queryCount(sql, new Object[]{version,appType});
+		return result;
+	}
+
+
+
+	/**查询IOS版本信息
+	 * @param client
+	 * @return
+	 */
+	public IosVersionVo getIosVesion(String client) {
+		String sql ="SELECT * FROM `ios_version` WHERE 1=1 and state='0' and appType = ? ORDER BY flag DESC LIMIT 0,1  ";
+		super.finit("ios_version");
+		IosVersionVo vo = super.tableDao.queryBean(IosVersionVo.class, sql, new Object[]{client});
+		return vo;
+	}
+
+
+
+	/**修改andriod版本信息
+	 * @param vo
+	 * @return
+	 */
+	public int updateAppVsn(AppVersionVo vo) {
+		super.finit("app_version");
+		int flag=super.tableDao.updateData(vo,"appId");
+		return flag;
+	}
+
+
+
+	
+	/* 查询APP版本列表
+	 * @see com.amwell.dao.IAppSettingDao#getAppVsnLIst(int, int)
+	 */
+	public Map<String, Object> getAppVsnLIst(int currentPageIndex, int pageSize) {
+		super.finit("app_version");
+		sql = "SELECT * FROM `app_version` WHERE TYPE='0' AND state='0' ORDER BY flag DESC  ";
+		List<AppVersionVo> vsnList = super.tableDao.queryByPage(AppVersionVo.class, sql, currentPageIndex, pageSize, new Object[]{});
+		Page page = new Page(vsnList, sql, currentPageIndex, pageSize);
+		map.put("list", vsnList);
+		map.put("page", page);
+		return map;
+	}
+
+
+
+	/**删除APP版本信息
+	 * @param appId
+	 */
+	public int deleteAppVsn(String appId) {
+		int flag=0;
+		super.finit("app_version");
+		sql="SELECT * FROM `app_version` WHERE appId= ? ";
+		AppVersionVo vo = super.tableDao.queryBean(AppVersionVo.class, sql, new Object[]{appId});
+		if(vo!=null){
+			vo.setState("1");
+			flag = super.tableDao.updateData(vo, "appId");
+		}
+		return flag;
+	}
+
+
+
+	/**修改IOS版本和版本号信息
+	 * @param vo
+	 * @return
+	 */
+	public int updateIosVsn(IosVersionVo vo) {
+		super.finit("ios_version");
+		int flag= super.tableDao.updateData(vo, "version");
+		return flag;
+	}
+
+	/**查询IOS版本列表
+	 * @param currentPageIndex
+	 * @param pageSize
+	 * @return
+	 */
+	public Map<String, Object> getIosVsnList(int currentPageIndex, int pageSize) {
+		super.finit("ios_version");
+		sql = "SELECT * FROM `ios_version` WHERE 1=1 AND state='0' ORDER BY flag DESC  ";
+		List<IosVersionVo> vsnList = super.tableDao.queryByPage(IosVersionVo.class, sql, currentPageIndex, pageSize, new Object[]{});
+		Page page = new Page(vsnList, sql, currentPageIndex, pageSize);
+		map.put("list", vsnList);
+		map.put("page", page);
+		return map;
+	}
+
+
+	/**删除IOS版本信息
+	 * @return
+	 * @throws IOException 
+	 */
+	public int deleteIosVsn(String appId) {
+		super.finit("ios_version");
+		String sql = "UPDATE ios_version SET state=1  WHERE iosId=? ";
+		int flag = super.tableDao.executeSQL(sql, new Object[]{appId});
+		return flag;
+	}
+
+
+}

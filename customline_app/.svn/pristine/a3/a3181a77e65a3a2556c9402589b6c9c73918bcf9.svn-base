@@ -1,0 +1,255 @@
+package com.pig84.ab.utils;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
+import org.apache.commons.httpclient.methods.EntityEnclosingMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.RequestEntity;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpEntity;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * HTTP Client.
+ * 
+ * @author GuoLin
+ */
+public class Http {
+
+	private static final Logger logger = LoggerFactory.getLogger(Http.class);
+
+	private static final int MAX_CONNECTIONS_PER_HOST = PropertyManage.getInt("httpclient.pool.max");
+
+	private static final int MAX_CONNECTIONS = PropertyManage.getInt("httpclient.pool.maxPerHost");;
+
+	private static final int WAIT_POOL_TIMEOUT = PropertyManage.getInt("httpclient.pool.timeout");
+
+	private static final int SOCKET_TIMEOUT = PropertyManage.getInt("httpclient.connect.socket.timeout");
+
+	private static final int CONNECT_TIMEOUT = PropertyManage.getInt("httpclient.connect.timeout");;
+
+	private static final CloseableHttpClient CLIENT = buildHttpClient();
+
+	private static final RequestConfig DEFAULT_CONF = RequestConfig.custom()
+			.setSocketTimeout(SOCKET_TIMEOUT)
+			.setConnectTimeout(CONNECT_TIMEOUT)
+			.setConnectionRequestTimeout(WAIT_POOL_TIMEOUT)
+			.build();
+
+	/**
+	 * Send HTTP POST request.
+	 * @param url URL to request
+	 * @param params Parameters
+	 * @return Response entity
+	 */
+	public static String post(String url, String... params) {
+		return post(url, toMap(params));
+	}
+
+	/**
+	 * Send HTTP POST request.
+	 * @param url URL to request
+	 * @param params Parameters
+	 * @return Response entity
+	 */
+	public static String post(String url, Map<String, String> params) {
+		HttpPost req = new HttpPost(url);
+		req.setConfig(DEFAULT_CONF);
+
+		// Assemble entity
+		List<NameValuePair> pairs = new ArrayList<NameValuePair>(params.size());
+		for (Map.Entry<String, String> entry : params.entrySet()) {
+			pairs.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
+		}
+		try {
+			req.setEntity(new UrlEncodedFormEntity(pairs, Env.DEFAULT_ENCODING));
+		} catch (UnsupportedEncodingException e) {
+			// Impossible
+		}
+
+		// Send request
+		logger.debug("Sending POST request to {} with entity: {}", url, params);
+		try (CloseableHttpResponse response = CLIENT.execute(req)) {
+			HttpEntity entity = response.getEntity();
+			try (InputStream instream = entity.getContent()) {
+				return IOUtils.toString(instream, Env.DEFAULT_ENCODING);
+			} finally {
+				EntityUtils.consume(entity);
+			}
+		} catch (IOException e) {
+			logger.error("Send POST request failed: {}", url, e);
+			return null;
+		}
+	}
+
+	public static String get(String url, String... params) {
+		return get(url, toMap(params));
+	}
+
+	/**
+	 * Send HTTP GET request.
+	 * @param baseUrl URL to request
+	 * @param params Parameters to append as query string
+	 * @return Response entity
+	 */
+	public static String get(String baseUrl, Map<String, String> params) {
+		String url = assembleUrl(baseUrl, params);
+		HttpGet req = new HttpGet(url);
+		req.setConfig(DEFAULT_CONF);
+
+		logger.debug("Sending GET request to {}", url);
+		try (CloseableHttpResponse response = CLIENT.execute(req)) {
+			HttpEntity entity = response.getEntity();
+			try (InputStream instream = entity.getContent()) {
+				return IOUtils.toString(instream, Env.DEFAULT_ENCODING);
+			} finally {
+				EntityUtils.consume(entity);
+			}
+		} catch (IOException e) {
+			logger.error("Send GET request failed: {}", url, e);
+			return null;
+		}
+	}
+
+	/**
+	 * Send HTTPS GET request.
+	 * @param baseUrl URL to request
+	 * @param params Parameters to append as query string
+	 * @return Response entity
+	 */
+	public static String getWithSSL(String baseUrl, String... params) {
+		return getWithSSL(baseUrl, toMap(params));
+	}
+
+	/**
+	 * Send HTTPS GET request.
+	 * @param baseUrl URL to request
+	 * @param params Parameters to append as query string
+	 * @return Response entity
+	 */
+	public static String getWithSSL(String baseUrl, Map<String, String> params) {
+		String url = assembleUrl(baseUrl, params);
+		try {
+			HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+			conn.setConnectTimeout(CONNECT_TIMEOUT);
+			conn.setReadTimeout(SOCKET_TIMEOUT);
+			try (InputStream in = conn.getInputStream()) {
+				return IOUtils.toString(in, Env.DEFAULT_ENCODING);
+			}
+		} catch (IOException e) {
+			logger.error("Send HTTPS GET request failed: {}", url, e);
+			return null;
+		}
+	}
+
+	private static String assembleUrl(String baseUrl, Map<String, String> params) {
+		StringBuilder query = new StringBuilder();
+		for (Map.Entry<String, String> entry : params.entrySet()) {
+			query.append('&').append(entry.getKey()).append('=').append(entry.getValue());
+		}
+		if (!baseUrl.contains("?")) {
+			query.replace(0, 1, "?");
+		}
+		return baseUrl + query.toString();
+	}
+
+	private static Map<String, String> toMap(String... params) {
+		if (params.length % 2 != 0) {
+			throw new IllegalArgumentException("Params count must be even.");
+		}
+		Map<String, String> map = new HashMap<String, String>(params.length / 2);
+		for (int i = 0; i < params.length; i += 2) {
+			String name = params[i];
+			String value = params[i + 1];
+			map.put(name, value);
+		}
+		return map;
+	}
+
+	private static CloseableHttpClient buildHttpClient() {
+		// Build HttpClient with pooling connection manager
+		PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
+		cm.setMaxTotal(MAX_CONNECTIONS);
+		cm.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_HOST);
+		final CloseableHttpClient httpClient = HttpClients.custom().setConnectionManager(cm).build();
+
+		// Shutdown
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				try {
+					httpClient.close();
+				} catch (IOException e) {
+					logger.error("Close HttpClient in shutdown hook failed.", e);
+				}
+			}
+		});
+		return httpClient;
+	}
+	
+	/**
+	 * 发送post请求,客户端采用二进制流发送,服务端采用二进制流接收
+	 * 
+	 * @param json
+	 *            入参的json格式的报文
+	 * @param url
+	 *            http服务器的地址
+	 * @return 返回响应信息
+	 */
+	public static String postHttpReq(String url, String json) {
+		org.apache.commons.httpclient.HttpClient httpClient = new org.apache.commons.httpclient.HttpClient();
+		EntityEnclosingMethod postMethod = new PostMethod();
+
+		byte b[] = json.getBytes();// 把字符串转换为二进制数据
+		RequestEntity requestEntity = new ByteArrayRequestEntity(b);
+
+		postMethod.setRequestEntity(requestEntity);// 设置数据
+
+		postMethod.setPath(url);// 设置服务的url
+		postMethod.setRequestHeader("Content-Type", "text/html;charset=UTF-8");// 设置请求头编码
+
+		// 设置连接超时
+		httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(5 * 1000);
+		// 设置读取超时
+		httpClient.getHttpConnectionManager().getParams().setSoTimeout(20 * 1000);
+
+		String responseMsg = "";
+		int statusCode = 0;
+		try {
+			statusCode = httpClient.executeMethod(postMethod);// 发送请求
+			responseMsg = postMethod.getResponseBodyAsString();// 获取返回值
+		} catch (HttpException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			postMethod.releaseConnection();
+			httpClient.getHttpConnectionManager().closeIdleConnections(0);
+		}
+		return responseMsg;
+	}
+
+}

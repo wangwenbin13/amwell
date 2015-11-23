@@ -1,0 +1,158 @@
+package com.pig84.ab.vo;
+
+/**
+ * 乘客订单座位信息表
+ */
+
+@SuppressWarnings("all")
+public class LineBusinessOrder implements java.io.Serializable {
+
+	private String localId;					//序号ID 
+	private String lineClassId;				//班次ID
+	private String passengerId;				//乘客ID
+	private String leaseOrderId;			//订单ID 
+	private String businessId;				//商户ID
+	private String tickets;					//订购张数
+	private String doCount;					//已经刷卡次数
+	private String price;					//实际支付金额
+	private String couponGiftId;			//优惠ID
+	private String giftMoney;				//优惠金额
+	private String type;					// 1:新用户特权   2：优惠卷   
+	private String remark;					//备注
+	private String outMoney;				//使用优惠券后剩余金额
+	private String oldclassid;				//临时班次ID（用于用户申请改签）
+	private String status;					//状态（0:正常  1:改签中   2:已改签）
+	private String totalPrice;				//单张票总额
+	private String classprice;				//车票单价
+	private String lineBaseId;				//线路ID
+	private String slineId;					//子线路ID
+	private String comment;					//评论次数
+	
+	
+	
+	
+	
+	
+	public String getComment() {
+		return comment;
+	}
+	public void setComment(String comment) {
+		this.comment = comment;
+	}
+	public String getSlineId() {
+		return slineId;
+	}
+	public void setSlineId(String slineId) {
+		this.slineId = slineId;
+	}
+	public String getLineBaseId() {
+		return lineBaseId;
+	}
+	public void setLineBaseId(String lineBaseId) {
+		this.lineBaseId = lineBaseId;
+	}
+	public String getClassprice() {
+		return classprice;
+	}
+	public void setClassprice(String classprice) {
+		this.classprice = classprice;
+	}
+	public String getTotalPrice() {
+		return totalPrice;
+	}
+	public void setTotalPrice(String totalPrice) {
+		this.totalPrice = totalPrice;
+	}
+	public String getOldclassid() {
+		return oldclassid;
+	}
+	public void setOldclassid(String oldclassid) {
+		this.oldclassid = oldclassid;
+	}
+	public String getStatus() {
+		return status;
+	}
+	public void setStatus(String status) {
+		this.status = status;
+	}
+	public String getOutMoney() {
+		return outMoney;
+	}
+	public void setOutMoney(String outMoney) {
+		this.outMoney = outMoney;
+	}
+	public String getCouponGiftId() {
+		return couponGiftId;
+	}
+	public void setCouponGiftId(String couponGiftId) {
+		this.couponGiftId = couponGiftId;
+	}
+	public String getGiftMoney() {
+		return giftMoney;
+	}
+	public void setGiftMoney(String giftMoney) {
+		this.giftMoney = giftMoney;
+	}
+	public String getType() {
+		return type;
+	}
+	public void setType(String type) {
+		this.type = type;
+	}
+	public String getRemark() {
+		return remark;
+	}
+	public void setRemark(String remark) {
+		this.remark = remark;
+	}
+	public String getPrice() {
+		return price;
+	}
+	public void setPrice(String price) {
+		this.price = price;
+	}
+	public String getLocalId() {
+		return localId;
+	}
+	public void setLocalId(String localId) {
+		this.localId = localId;
+	}
+	public String getLineClassId() {
+		return lineClassId;
+	}
+	public void setLineClassId(String lineClassId) {
+		this.lineClassId = lineClassId;
+	}
+	public String getPassengerId() {
+		return passengerId;
+	}
+	public void setPassengerId(String passengerId) {
+		this.passengerId = passengerId;
+	}
+	public String getLeaseOrderId() {
+		return leaseOrderId;
+	}
+	public void setLeaseOrderId(String leaseOrderId) {
+		this.leaseOrderId = leaseOrderId;
+	}
+	public String getBusinessId() {
+		return businessId;
+	}
+	public void setBusinessId(String businessId) {
+		this.businessId = businessId;
+	}
+	public String getTickets() {
+		return tickets;
+	}
+	public void setTickets(String tickets) {
+		this.tickets = tickets;
+	}
+	public String getDoCount() {
+		return doCount;
+	}
+	public void setDoCount(String doCount) {
+		this.doCount = doCount;
+	}
+
+	
+}

@@ -1,0 +1,1041 @@
+package com.pig84.ab.dao.impl;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import com.pig84.ab.dao.BaseDao;
+import com.pig84.ab.dao.IDriverDao;
+import com.pig84.ab.dao.IStationInfoDao;
+import com.pig84.ab.utils.Conn;
+import com.pig84.ab.utils.DESCryptUtil;
+import com.pig84.ab.utils.IdGenerator;
+import com.pig84.ab.utils.JPush;
+import com.pig84.ab.utils.Message;
+import com.pig84.ab.utils.MyDate;
+import com.pig84.ab.utils.PropertyManage;
+import com.pig84.ab.utils.Sha1Utils;
+import com.pig84.ab.vo.DriverScheduleInfo;
+import com.pig84.ab.vo.LineClassInfo;
+import com.pig84.ab.vo.PayedPassenger;
+import com.pig84.ab.vo.StationInfo;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_10;
+import com.pig84.ab.vo.bean.AppVo_2;
+import com.pig84.ab.vo.bean.AppVo_2_list;
+import com.pig84.ab.vo.bean.AppVo_3;
+import com.pig84.ab.vo.bean.AppVo_3_list;
+import com.pig84.ab.vo.bean.AppVo_4;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_7_list;
+import com.pig84.ab.vo.bean.AppVo_8;
+import com.pig84.ab.vo.driver.DriverAccountDetail;
+import com.pig84.ab.vo.driver.DriverFeedback;
+import com.pig84.ab.vo.driver.DriverInfoEntity;
+import com.pig84.ab.vo.driver.DriverWithdrawAskfor;
+
+@Repository
+public class DriverDaoImpl extends BaseDao implements IDriverDao {
+	
+	@Autowired
+	private IStationInfoDao stationInfoDao;
+	
+	
+	/**
+	 * 登录
+	 */
+	public DriverInfoEntity login(String telephone, String passWord,String terminal, String passWord_, String imei) {
+
+		// accountStatustinyint(4) NULL0:启用 1:禁用 2:删除
+		String sql = "SELECT d.*,m.brefName AS businessName FROM driver_info d,mgr_business m WHERE d.businessId = m.businessId AND d.telephone = ? and d.accountStatus = '0'";
+		Object[] params = new Object[1];
+		params[0] = telephone;
+		DriverInfoEntity p = queryBean(DriverInfoEntity.class, sql,params);
+
+		DriverInfoEntity user = new DriverInfoEntity();
+		if (p == null) {
+			user.setFlag("1");// 用户不存在
+			return user;
+		}
+		if (!p.getPassWord().equals(passWord)) {
+			user.setFlag("2");// 密码错误
+			return user;
+		}
+		p.setFlag("0"); // 正常
+
+		if (null == p || StringUtils.isBlank(p.getDisplayId())) {
+			DriverInfoEntity driver = queryBean(DriverInfoEntity.class,"SELECT MAX(CAST(displayid AS SIGNED INTEGER)) as displayId FROM driver_info where accountStatus = '0'");
+			if (driver == null || driver.getDisplayId() == null|| "".equals(driver.getDisplayId())) {
+				p.setDisplayId("10000");
+			} else {
+				p.setDisplayId(String.valueOf(Integer.valueOf(driver.getDisplayId()) + 1));
+			}
+		}
+
+		String sql_u = "update driver_info set displayId = ?,terminal = ?,comments=?,sessionid = ? where telephone = ? and accountStatus = '0'";
+		String sessionid = IdGenerator.uuid();
+		params = new Object[5];
+		params[0] = p.getDisplayId();
+		params[1] = terminal;
+		params[2] = DESCryptUtil.des(telephone + "&" + passWord_);
+		params[3] = sessionid;
+		params[4] = telephone;
+		executeSQL(sql_u, params);
+		p.setSessionid(sessionid);
+		return p;
+	}
+
+	/**
+	 * 检查手机号是否注册
+	 * 
+	 * @param mobile
+	 * @return
+	 */
+	public String checkMobile(String mobile) {
+		String sql = "select * from driver_info where telephone = ? ";
+		Object[]  params = new Object[1];
+		params[0] = mobile;
+		int count = queryCount(sql, params);
+		if (count > 0) {
+			return "0";
+		} else {
+			return "1";
+		}
+	}
+
+	/**
+	 * 找回密码
+	 */
+	public String updatePwd(String mobileNo, String pwd, String pwd_) {
+		String sql = "select * from driver_info where telephone = ? ";
+		Object[] params = new Object[1];
+		params[0] = mobileNo;
+		DriverInfoEntity vo = queryBean(DriverInfoEntity.class, sql,
+				params);
+		if (vo == null) {
+			return "0";// 该手机号码尚未注册q
+		} else {
+			String sql_t = "update driver_info set passWord = ?,comments=? where telephone = ?";
+			params = new Object[3];
+			params[0] = pwd;
+			params[1] = DESCryptUtil.des(mobileNo + "&" + pwd_);
+			params[2] = mobileNo;
+			int flag = executeSQL(sql_t, params);
+			if (flag != -1) {
+				return "1";// 成功
+			} else {
+				return "2";// 失败
+			}
+		}
+	}
+
+	/** 修改司机信息 **/
+	public String updateDriverInfo(String driverId, String headerPicUrl,
+			String sex, String oldPwd, String newPwd) {
+		String sql = "select * from driver_info where driverId = ? ";
+		Object[] params = new Object[1];
+		params[0] = driverId;
+		DriverInfoEntity p = queryBean(DriverInfoEntity.class, sql,
+				params);
+		if (null == p) {
+			return "-1";// 用户不存在
+		}
+
+		if (StringUtils.isNotBlank(oldPwd) && !oldPwd.equals(p.getPassWord())) {
+			return "1";// 原密码错误
+		}
+		if (StringUtils.isNotBlank(headerPicUrl)) {
+			p.setHeaderPicUrl(headerPicUrl);
+		}
+		if (StringUtils.isNotBlank(sex)) {
+			p.setSex(new Short(sex));
+		}
+
+		if (StringUtils.isNotBlank(newPwd)) {
+
+			// 开发人员备用字段
+			String comments = DESCryptUtil.des(p.getTelephone() + "&" + newPwd);
+
+			// 加密新密码
+			newPwd = Sha1Utils.encrypt(p.getTelephone() + "&" + newPwd);
+
+			p.setPassWord(newPwd);
+			p.setComments(comments);
+		}
+		int flag = updateData(p,"driver_info", "driverId");
+
+		if (flag == 1) {
+			return "2";// 成功
+		} else {
+			return "3";// 失败
+		}
+	}
+
+	/** 根据司机id获取司机信息 **/
+	public DriverInfoEntity getDriverById(String driverId) {
+		String sql = "select * from driver_info where driverId = ? ";
+		Object[] params = new Object[1];
+		params[0] = driverId;
+		DriverInfoEntity vo = queryBean(DriverInfoEntity.class, sql,
+				params);
+		return vo;
+	}
+
+	/** 获取司机行程 **/
+	public AppVo_7_list getDriverScheduleById(String driverId, String flag) {
+
+		// 查询司机的获赞个数、服务次数、奖励次数
+		String sql = "select praisedNum AS a1,dispatchNum AS a2,awardedNum AS a3 from driver_info where driverId = ? ";
+		Object[] params = new Object[1];
+		params[0] = driverId;
+		AppVo_3 vo = queryBean(AppVo_3.class, sql, params);
+
+		// 查询未读消息个数
+		sql = "SELECT localId FROM sys_msg_user WHERE userId = ? AND readFlag = '0'";
+		params = new Object[1];
+		params[0] = driverId;
+		int msgCount = queryCount(sql, params);
+
+		// 查询司机当天行程
+		String temp1 = null;
+		if ("1".equals(flag)) {// 取当天日期
+			temp1 = "CURDATE()";
+		} else {// 取第二天日期
+			temp1 = "DATE_ADD(CURDATE(), INTERVAL 1 DAY)";
+		}
+		sql = "SELECT lbi.lineBaseId AS a1,lbi.lineKm AS a4,lbi.lineTime AS a5,lci.orderStartTime AS a6,"
+				+ "lci.dispatchStatus as a7,lci.currentStationName as a8,lci.lineClassId AS a9 FROM line_class_info lci,line_base_info lbi"
+				+ " WHERE lci.lineBaseId = lbi.lineBaseId AND lci.driverId = ? AND lci.delflag = '0' AND lci.orderdate = "
+				+ temp1
+				+ " GROUP BY lci.orderStartTime ORDER BY lci.orderStartTime ASC";
+		params = new Object[1];
+		params[0] = driverId;
+		List<AppVo_10> list = queryList(AppVo_10.class, sql, params);
+		if (null != list && list.size() > 0) {
+			String startStationName = null;
+			String endStationName = null;
+			AppVo_10 vo10 = null;
+			for (int i = 0; i < list.size(); i++) {
+				vo10 = list.get(i);
+				List<StationInfo> stationInfoList = stationInfoDao.listByLineId(vo10.getA1());
+				startStationName = stationInfoList.get(0).getName();
+				endStationName = stationInfoList.get(stationInfoList.size()-1).getName();
+				list.get(i).setA2(startStationName);// 起点
+				list.get(i).setA3(endStationName);// 终点
+
+				if ("0".equals(vo10.getA7())) {// 当线路未发车时计算倒计时时长
+					String currentTime = MyDate.Format.DATETIME.now();
+					String startTime = currentTime.split(" ")[0] + " "
+							+ vo10.getA6() + ":00";
+					Long currentTimeLong = MyDate.Format.DATETIME.parse(currentTime).getTime();
+					Long startTimeLong = MyDate.Format.DATETIME.parse(startTime).getTime();
+					Long totalTime = (startTimeLong - currentTimeLong) / 1000 / 60;// 转换为分钟
+					list.get(i).setA10(totalTime + "");// 倒计时时长
+				} else {
+					list.get(i).setA10("0");
+				}
+			}
+		}
+
+		// 查询明天是否存在行程安排
+		int scheduleCount = 0;
+		if ("1".equals(flag)) {// 获取当前日期的行程时，才需要判断第二天是否存在行程信息；当获取第二天行程时，就不再需要判断下一天是否存在行程信息了
+			sql = "SELECT lci.lineClassId FROM line_class_info lci WHERE lci.driverId = ? AND lci.delflag = '0' AND lci.orderdate = DATE_ADD(CURDATE(), INTERVAL 1 DAY) GROUP BY lci.orderStartTime";
+			params = new Object[1];
+			params[0] = driverId;
+			scheduleCount = queryCount(sql, params);
+		}
+
+		AppVo_7_list al = new AppVo_7_list();
+		al.setA1(vo.getA1());// 获赞个数
+		al.setA2(vo.getA2());// 服务次数
+		al.setA3(vo.getA3());// 奖励次数
+		al.setA4(msgCount + "");// 未读消息个数
+		al.setA5(scheduleCount == 0 ? "0" : "1");// 明天是否有行程安排：0.无 1.有
+		String curDate = MyDate.Format.DATE.format(new Date());// 取当天日期
+		if ("2".equals(flag)) {// 取第二天日期
+			Date d = DateUtils.addDays(MyDate.Format.DATE.parse(curDate), 1);
+			curDate = MyDate.Format.DATE.format(d);
+		}
+		String[] strs = curDate.split("-");
+		String temp = strs[1] + "月" + strs[2] + "日";
+		al.setA6(temp);// 当天日期
+		al.setA7(MyDate.getweekofday(curDate));// 当天星期
+		al.setList(list);// 今天的行程列表
+		return al;
+	}
+
+	/**
+	 * 获取司机行程详情
+	 * 
+	 * @param lineBaseId 线路id
+	 * 
+	 * @param lineClassId 班次id
+	 * 
+	 * @return
+	 * 
+	 */
+	public DriverScheduleInfo getScheduleDetail(String lineBaseId, String lineClassId) {
+		DriverScheduleInfo driverScheduleInfo = getDriverSchedule(lineBaseId, lineClassId);
+		if (null == driverScheduleInfo) {
+			return null;
+		}
+		driverScheduleInfo.setA2(stationInfoDao.generateStationNameArrayByLineId(driverScheduleInfo.getA1()));
+		driverScheduleInfo.setA3(stationInfoDao.generateStationIdArrayByLineId(driverScheduleInfo.getA1()));
+		int totalBuyPeople = getTotalBuyPeople(lineBaseId,lineClassId);
+		driverScheduleInfo.setA11(String.valueOf(totalBuyPeople));
+		int totalAboardPeople = getTotalAboardPeople(lineBaseId, lineClassId);
+		driverScheduleInfo.setA12(String.valueOf(totalAboardPeople));
+		driverScheduleInfo.setA13("0");
+		if ("0".equals(driverScheduleInfo.getA7())) {
+			Long totalTime = calcuTimeCount(driverScheduleInfo.getA6());
+			driverScheduleInfo.setA14(String.valueOf(totalTime));
+		} else {
+			driverScheduleInfo.setA14("0");
+		}
+		String groupId = getGroupIdByLineId(lineBaseId);
+		driverScheduleInfo.setA15(groupId);
+		List<StationInfo> stationInfoList = stationInfoDao.listByLineId(driverScheduleInfo.getA1());
+		if (stationInfoList!=null) {
+			Map<String,Object> map = calcuCoordinate(stationInfoList);
+			driverScheduleInfo.setA16((String)map.get("a16"));// 保存经纬度字符串
+			driverScheduleInfo.setA17((String)map.get("a17"));//上车点下车点标识
+			String onBoardNum = getOnBoardNum(lineBaseId, lineClassId, stationInfoList);
+			driverScheduleInfo.setA18(onBoardNum);// 各站点上下车人数
+		}
+		driverScheduleInfo.setA0(getGPSNo(lineClassId));
+		return driverScheduleInfo;
+	}
+
+	/**
+	 * 计算经纬度字符串
+	 * 
+	 * @param stationInfoList 站点列表
+	 * 
+	 * @return
+	 * 
+	 */
+	private Map<String,Object> calcuCoordinate(List<StationInfo> stationInfoList) {
+		Map<String,Object> map=new HashMap<String, Object>();
+		String coordinate = null;
+		String type = null;
+		for (StationInfo stationInfo : stationInfoList) {
+			if (null == coordinate) {
+				coordinate = stationInfo.getCoord().toString();
+			} else {
+				coordinate = coordinate + ";" + stationInfo.getCoord().toString();
+			}
+			if(null==type){
+				type=stationInfo.getType()+"";
+			}
+			else{
+				type=type+","+stationInfo.getType();
+			}
+		}
+		map.put("a16", coordinate);
+		map.put("a17", type);
+		return map;
+	}
+
+	/**
+	 * 获取各个站点的上下车人数
+	 * 
+	 * @param lineBaseId 线路id
+	 * 
+	 * @param lineClassId 班次id
+	 * 
+	 * @param stationInfoList 站点列表
+	 * 
+	 * @return
+	 */
+	private String getOnBoardNum(String lineBaseId, String lineClassId, List<StationInfo> stationInfoList) {
+		int theCount;
+		StringBuffer onBoardNum = new StringBuffer();
+		Object[] params = null;
+		for (int index=0;index < stationInfoList.size();index++) {
+			StringBuffer sqlBuffer = new StringBuffer();
+			StationInfo stationInfo = stationInfoList.get(index);
+			sqlBuffer.append(" select lbi.leaseOrderId from lease_base_info lbi,line_business_order lbo");
+			sqlBuffer.append(" where lbi.leaseOrderNo = lbo.leaseOrderId and lbi.lineBaseId = ? and lbo.lineClassId = ? ");
+			sqlBuffer.append(" and (lbi.ustation = ? or lbi.dstation = ?) and lbi.ispay = '1' and lbo.status in('0','2')");
+
+			params = new Object[4];
+			params[0] = lineBaseId;
+			params[1] = lineClassId;
+			params[2] = stationInfo.getId();
+			params[3] = stationInfo.getId();
+			theCount = queryCount(sqlBuffer.toString(), params);
+			if (index==0) {
+				onBoardNum.append(theCount);
+			} else {
+				onBoardNum.append(",").append(theCount);
+			}
+		}
+		return onBoardNum.toString();
+	}
+
+	/**
+	 * 获取GPS设备号
+	 * 
+	 * @param lineClassId 班次id
+	 * 
+	 * @return
+	 * 
+	 */
+	private String getGPSNo(String lineClassId) {
+		String gpsNoSql = "SELECT a.GPSNo as a1 FROM vehicle_info a LEFT JOIN  line_class_info b ON a.vehicleid =b.vehicleid WHERE b.lineClassId= ?";
+		Object[] params = new Object[1];
+		params[0] = lineClassId;
+		AppVo_1 appVo1 = queryBean(AppVo_1.class, gpsNoSql, params);
+		return appVo1.getA1();
+	}
+
+	/**
+	 * 计算倒计时的时间
+	 * 
+	 * @param startTime 发车时间
+	 * 
+	 * @return
+	 */
+	private Long calcuTimeCount(String startTime) {
+		String currentTime = MyDate.Format.DATETIME.now();
+		startTime = currentTime.split(" ")[0] + " " + startTime + ":00";
+		Long currentTimeLong = MyDate.Format.DATETIME.parse(currentTime).getTime(); 
+		Long startTimeLong = MyDate.Format.DATETIME.parse(startTime).getTime();
+		Long totalTime = (startTimeLong - currentTimeLong) / 1000 / 60;
+		return totalTime;
+	}
+
+	/**
+	 * 根据线路id获取群组id
+	 * 
+	 * @param lineBaseId 线路id
+	 * 
+	 * @return
+	 * 
+	 */
+	private String getGroupIdByLineId(String lineBaseId) {
+		String sql = "SELECT groupId AS a1 FROM im_group_info WHERE lineBaseId = ?";
+		Object[] params = new Object[1];
+		params[0] = lineBaseId;
+		AppVo_1 vo1 = queryBean(AppVo_1.class, sql, params);
+		if(vo1==null){
+			return null;
+		}else{
+			return vo1.getA1();
+		}
+	}
+
+	/**
+	 * 查询该班次已上车的人数
+	 * 
+	 * @param lineBaseId 线路id
+	 * 
+	 * @param lineClassId 班次id
+	 * 
+	 * @return
+	 * 
+	 */
+	private int getTotalAboardPeople(String lineBaseId, String lineClassId) {
+		StringBuffer sqlBuffer = new StringBuffer();
+		sqlBuffer.append(" select lbi.leaseOrderId from lease_base_info lbi,line_business_order lbo ");
+		sqlBuffer.append(" where lbi.leaseOrderNo = lbo.leaseOrderId and lbi.lineBaseId = ? and lbo.lineClassId = ? and lbi.ispay = '1' and lbo.isAboard = '1'");
+		Object[] params = new Object[2];
+		params[0] = lineBaseId;
+		params[1] = lineClassId;
+		return queryCount(sqlBuffer.toString(), params);
+	}
+
+	/**
+	 * 查询购买该班次的总人数
+	 * 
+	 * @param lineBaseId 线路id
+	 * 
+	 * @param lineClassId 班次id
+	 * 
+	 * @return
+	 * 
+	 */
+	private int getTotalBuyPeople(String lineBaseId,String lineClassId) {
+		StringBuffer sqlBuffer = new StringBuffer();
+		sqlBuffer.append(" select lbi.leaseOrderId from lease_base_info lbi,line_business_order lbo ");
+		sqlBuffer.append(" where lbi.leaseOrderNo = lbo.leaseOrderId and lbi.lineBaseId = ? and lbo.lineClassId = ? and lbi.ispay = '1' and lbo.status in('0','2')");
+		Object[] params = new Object[2];
+		params[0] = lineBaseId;
+		params[1] = lineClassId;
+		return queryCount(sqlBuffer.toString(), params);
+	}
+
+	/**
+	 * 根据线路id和班次id获取司机行程基本信息
+	 * 
+	 * @param lineBaseId 线路id
+	 * 
+	 * @param lineClassId 班次id
+	 * 
+	 * @return
+	 * 
+	 */
+	private DriverScheduleInfo getDriverSchedule(String lineBaseId, String lineClassId) {
+		StringBuffer sqlBuffer = new StringBuffer();
+		sqlBuffer.append(" select lbi.lineBaseId as a1,lbi.lineKm as a4,lbi.lineTime as a5,lci.orderStartTime as a6,");
+		sqlBuffer.append(" lci.dispatchStatus as a7,lci.currentStationName as a8,lci.lineClassId as a9,lci.totalTime as a10 ");
+		sqlBuffer.append(" from line_class_info lci,line_base_info lbi");
+		sqlBuffer.append(" where lci.lineBaseId = lbi.lineBaseId and lbi.lineBaseId = ? and lci.lineClassId = ?");
+		Object[] params = new Object[2];
+		params[0] = lineBaseId;
+		params[1] = lineClassId;
+		return queryBean(DriverScheduleInfo.class, sqlBuffer.toString(), params);
+	}
+
+	/** 查询延误消息模版 **/
+	public List<AppVo_4> getDelayMsgList() {
+		String sql = "SELECT delayMsgId AS a1,msgTitle AS a2,msgContent AS a3,delayLevel as a4 FROM delay_msg_info";
+		List<AppVo_4> list = queryList(AppVo_4.class, sql);
+		return list;
+	}
+
+	/**
+	 * 修改班次相关信息
+	 * 
+	 * @param lineClassId 班次id
+	 *  
+	 * @param delayMsgId 延迟消息id 
+	 * 
+	 * @param dispatchStatus 发车状态（0.未发车 1.已发车 2.行程结束）
+	 * 
+	 * @param currentStationName 当前站名
+	 * 
+	 **/
+	public String updateLineClass(String lineBaseId, String lineClassId,String driverId, String delayMsgId, String dispatchStatus,String currentStationName) {
+		LineClassInfo lineClassInfo = getLineClassInfoByLineId(lineClassId);
+		if (null == lineClassInfo) {
+			// 班次不存在
+			return "-1";
+		} 
+		if (!MyDate.Format.DATE.now().equals(lineClassInfo.getOrderDate())) {
+			// 班次的排班日期不是当天
+			return "-2";
+		}
+		if (!lineClassInfo.getLineBaseId().equals(lineBaseId)) {
+			// 班次和线路不对应
+			return "-3";
+		}
+		if (!lineClassInfo.getDriverId().equals(driverId)) {
+			// 班次和司机不对应
+			return "-4";
+		}
+		List<String> conditionList = new ArrayList<String>();
+		String temp = "";
+		List<PayedPassenger> payedPassengers = getPayedPassenger(lineBaseId, lineClassId);
+		if (StringUtils.isNotBlank(delayMsgId)) {
+			temp = temp + "`isDelay` = ? ,`delayMsgId` = ? ,";
+			conditionList.add("1");
+			conditionList.add(delayMsgId);
+			String delayTime = getDelayTimeById(delayMsgId);
+			if (!StringUtils.isEmpty(delayTime)) {
+				temp = temp + "`delayTime` = ? ,";
+				conditionList.add(delayTime);
+			}
+			
+			if (null != payedPassengers && payedPassengers.size() > 0) {
+				if (StringUtils.isBlank(delayTime)) {
+					sendCancleClassMsg(payedPassengers);
+				} else {
+					sendDelayClassMsg(delayTime, payedPassengers);
+				}
+				logger.info("{} 延误发车，给乘客发短信: {}", lineBaseId, delayMsgId);
+			}
+		}
+		if (StringUtils.isNotBlank(currentStationName)) {// 下一步等操作
+			temp = temp + "`currentStationName` = ? ,";
+			conditionList.add(currentStationName);
+		}
+		if (StringUtils.isNotBlank(dispatchStatus)) {
+			if ("1".equals(dispatchStatus)) {// 确认发车，记录发车状态和当前站名
+				temp = temp + "`dispatchStatus` = ? ,";
+			}
+			if ("2".equals(dispatchStatus)) {// 行程结束，记录发车状态、当前站名及行程总时长
+				String currentTime = MyDate.Format.DATETIME.now();
+				String startTime = currentTime.split(" ")[0] + " " + lineClassInfo.getOrderStartTime() + ":00";
+				Long currentTimeLong = MyDate.Format.DATETIME.parse(currentTime).getTime();
+				Long startTimeLong = null;
+				if (StringUtils.isNotBlank(lineClassInfo.getDelayTime())) {
+					startTimeLong = MyDate.Format.DATETIME.parse(startTime).getTime() + Integer.parseInt(lineClassInfo.getDelayTime()) * 60 * 1000;
+				} else {
+					startTimeLong = MyDate.Format.DATETIME.parse(startTime).getTime();
+				}
+				Long totalTime = (currentTimeLong - startTimeLong) / 1000 / 60;// 转换为分钟
+				// 行程结束时计算行程总时长
+				temp = temp + "`totalTime` = ? ,";
+				conditionList.add(totalTime + "");
+				temp = temp + "`dispatchStatus` = ? ,";
+			}
+			conditionList.add(dispatchStatus);
+		}
+		temp = temp.substring(0, temp.length() - 1);
+		String sql = "update `line_class_info` set " + temp + "where `lineClassId` = ?";
+		conditionList.add(lineClassId);
+		int flag = executeSQL(sql, conditionList.toArray());
+		if (flag == 1) {
+			// 确认发车成功，给用户发通知
+			if ("1".equals(dispatchStatus)) {
+				// 查询已买票的乘客电话
+				if (null != payedPassengers && payedPassengers.size() > 0) {
+					for (PayedPassenger payedPassenger : payedPassengers) {
+						StringBuffer contentBuffer = new StringBuffer();
+						contentBuffer.append("【小猪巴士】你所乘坐的巴士专线 (").append(payedPassenger.getUstationName()).append("—" + payedPassenger.getDstationName()).append(")");
+						contentBuffer.append(" 已经从起点 (").append(payedPassenger.getStartStationName());
+						contentBuffer.append(") 发车了，请提前在您上车站点候车。");
+						JPush.alert(contentBuffer.toString(), payedPassenger.getTelephone().split(","));
+					}
+				}
+			}
+			return "2";// 成功
+		} else {
+			return "3";// 失败
+		}
+	}
+
+	/**
+	 * 发送延迟的班次的通知
+	 * 
+	 * @param delayTime 延迟时间
+	 * 
+	 * @param payedPassengers 已购票乘客
+	 */
+	private void sendDelayClassMsg(String delayTime, List<PayedPassenger> payedPassengers) {
+		for (PayedPassenger payedPassenger : payedPassengers) {
+			StringBuffer contextBuffer = new StringBuffer();
+			contextBuffer.append("【小猪巴士】尊敬的先生/小姐，");
+			contextBuffer.append("“"+payedPassenger.getUstationName()).append("—").append(payedPassenger.getDstationName()+"”");
+			contextBuffer.append("线路由于路况因素，导致班车会晚点到达始发站，请各位耐心等待，在此非常感谢您的支持！");
+			new Message(contextBuffer.toString()).sendTo(payedPassenger.getTelephone());
+		}
+		
+		
+	}
+
+	/**
+	 * 出现故障 取消班次
+	 * 
+	 * @param payedPassengers 已购票乘客
+	 */
+	private void sendCancleClassMsg(List<PayedPassenger> payedPassengers) {
+		for (PayedPassenger payedPassenger : payedPassengers) {
+			// 给乘客发短信
+			StringBuffer contextBuffer = new StringBuffer();
+			contextBuffer.append("【小猪巴士】尊敬的先生/小姐，");
+			contextBuffer.append("“"+payedPassenger.getUstationName()).append("—").append(payedPassenger.getDstationName()+"”");
+			contextBuffer.append("线路由于车辆故障，无法正常发车，请大家换乘其他交通工具，小猪将给予订票客户发放相应优惠券作为补偿，感谢您的支持！");
+			new Message(contextBuffer.toString()).sendTo(payedPassenger.getTelephone());
+		}
+	}
+
+	/**
+	 * 获取已购票乘客列表
+	 * 
+	 * @param lineBaseId 线路id
+	 * 
+	 * @param lineClassId 班次id
+	 * 
+	 * @return
+	 * 
+	 */
+	private List<PayedPassenger> getPayedPassenger(String lineBaseId, String lineClassId) {
+		StringBuffer sqlBuffer = new StringBuffer();
+		sqlBuffer.append(" select distinct p.telephone as telephone,");
+		sqlBuffer.append(" (select lsi.name from pb_station lsi where lsi.id = lbi.ustation) as ustationName,");
+		sqlBuffer.append(" (select lsi1.name from pb_station lsi1 where lsi1.id = lbi.dstation) as dstationName");
+		sqlBuffer.append(" from line_base_info lb,lease_base_info lbi,line_business_order lbo,passenger_info p ");
+		sqlBuffer.append(" where lb.lineBaseId = lbi.lineBaseId and lbi.leaseOrderNo = lbo.leaseOrderId and lbo.passengerId = p.passengerId ");
+		sqlBuffer.append(" and lbi.ispay = '1' and lbi.lineBaseId = ? and lbo.lineClassId = ?");
+		Object[] params = new Object[2];
+		params[0] = lineBaseId;
+		params[1] = lineClassId;
+		List<PayedPassenger> payedPassengers = queryList(PayedPassenger.class, sqlBuffer.toString(), params);
+		if(payedPassengers!=null){
+			String startStationName = null;
+			List<StationInfo> stationInfoList = stationInfoDao.listByLineId(lineBaseId);
+			if(stationInfoList!=null&&stationInfoList.size()>0){
+				startStationName = stationInfoList.get(0).getName();
+			}
+			for(PayedPassenger payedPassenger : payedPassengers){
+				payedPassenger.setStartStationName(startStationName);
+			}
+		}
+		return payedPassengers;
+	}
+
+	/**
+	 * 获取延迟时间
+	 * 
+	 * @param delayMsgId 延迟信息id
+	 * 
+	 * @return
+	 * 
+	 */
+	private String getDelayTimeById(String delayMsgId) {
+		String s = "select delayTime as a1 from delay_msg_info where delayMsgId = ?";
+		Object[] params = new Object[1];
+		params[0] = delayMsgId;
+		AppVo_1 vo1 = queryBean(AppVo_1.class, s, params);
+		if(vo1==null){
+			return null;
+		}else{
+			return vo1.getA1();
+		}
+	}
+
+	/**
+	 * 根据id获取班次信息
+	 * 
+	 * @param lineClassId 班次Id
+	 * 
+	 * @return
+	 * 
+	 */
+	private LineClassInfo getLineClassInfoByLineId(String lineClassId) {
+		String sql = "select orderDate,lineBaseId,driverId,orderStartTime,delayTime from line_class_info where lineClassId = ?";
+		Object[] params = new Object[1];
+		params[0] = lineClassId;
+		return queryBean(LineClassInfo.class, sql, params);
+	}
+
+	/** 添加圈子用户关系信息 **/
+	public int addImGroupUser(String orderNo) {
+
+		// 根据订单号查询购买当天票的im用户id、乘客昵称、圈子id
+		String sql = "SELECT iui.userId AS a1,p.nickName AS a2,igi.groupId AS a3,lbi.ustation as a4 FROM lease_base_info lbi,line_business_order lbo,line_class_info lci,passenger_info p,im_group_info igi,im_user_info iui "
+				+ "WHERE lbi.leaseOrderNo = lbo.leaseOrderId and lbo.lineClassId = lci.lineClassId AND lbo.passengerId = p.passengerId AND lci.lineBaseId = igi.lineBaseId AND "
+				+ "lbo.leaseOrderId = ? and lbi.ispay = '1' AND lci.orderDate = CURDATE() and p.passengerId = iui.passengerId";
+		Object[] params = new Object[1];
+		params[0] = orderNo;
+		AppVo_4 vo3 = queryBean(AppVo_4.class, sql, params);
+		if (null != vo3 && StringUtils.isNotBlank(vo3.getA1())) {
+			sql = "SELECT ugInfoId FROM im_ug_info WHERE groupId = ? AND userId = ? AND stationMark = ?";
+			params = new Object[3];
+			params[0] = vo3.getA3();
+			params[1] = vo3.getA1();
+			params[2] = vo3.getA4();
+			int theCount = queryCount(sql, params);
+			if (theCount == 0) {
+				// 添加im_ug_info信息(将购买当天票的乘客放入圈子)
+				sql = "INSERT INTO `im_ug_info` "
+						+ "(`groupId`, `userId`, `userLevel`,`userNickName`,`isTop`, `isDisturb`, `createTime`,`stationMark`) "
+						+ "VALUES(?,?,'1',?,'0','0',UNIX_TIMESTAMP(),?)";
+				params = new Object[4];
+				params[0] = vo3.getA3();
+				params[1] = vo3.getA1();
+				params[2] = vo3.getA2();
+				params[3] = vo3.getA4();
+				int flag = executeSQL(sql, params);
+				return flag;
+			}
+		}
+		return 0;
+	}
+
+	/** 添加圈子用户 **/
+	public String addImUser(String userId, String userMark) {
+		String imUserId = returnImUserId(userId, userMark);
+		if (null == imUserId) {// 如果该im用户不存在，则添加
+			String sql = "INSERT INTO `im_user_info` (`passengerId`,`userMark`) VALUES(?,?)";
+			Object[] params = new Object[2];
+			params[0] = userId;
+			params[1] = userMark;
+			int flag = executeSQL(sql, params);
+			if (flag == 1) {
+				return returnImUserId(userId, userMark);
+			}
+		} else {
+			return imUserId;
+		}
+		return null;
+	}
+
+	// 返回im用户id
+	private String returnImUserId(String userId, String userMark) {
+		String sql = "select userId as a1 from im_user_info where passengerId = ? and userMark = ?";
+		Object[] params = new Object[2];
+		params[0] = userId;
+		params[1] = userMark;
+		AppVo_1 vo1 = queryBean(AppVo_1.class, sql, params);
+		if (null != vo1 && StringUtils.isNotBlank(vo1.getA1())) {
+			return vo1.getA1();
+		}
+		return null;
+	}
+
+	/** 查询已上车用户信息 **/
+	public AppVo_2_list getAboardUserInfo(String lineBaseId, String lineClassId) {
+
+		AppVo_2_list vl = new AppVo_2_list();
+		Object[] params = new Object[2];
+		params[0] = lineBaseId;
+		params[1] = lineClassId;
+		// 查询未上车用户信息
+		String sql = "SELECT p.nickName AS a1,p.telephone AS a2,lbo.isAboard AS a3,iui.userId AS a4 FROM lease_base_info lbi,line_business_order lbo,passenger_info p,im_user_info iui "
+				+ "WHERE iui.passengerId = p.passengerId AND lbo.passengerId = p.passengerId AND lbi.leaseOrderNo = lbo.leaseOrderId "
+				+ "AND lbi.lineBaseId = ? AND lbo.lineClassId = ? AND lbi.ispay = '1' AND lbo.isAboard = '0'";
+		List<AppVo_4> list1 = queryList(AppVo_4.class, sql, params);
+
+		// 查询已上车用户信息
+		sql = "SELECT p.nickName AS a1,p.telephone AS a2,lbo.isAboard AS a3,iui.userId AS a4 FROM lease_base_info lbi,line_business_order lbo,passenger_info p,im_user_info iui "
+				+ "WHERE iui.passengerId = p.passengerId AND lbo.passengerId = p.passengerId AND lbi.leaseOrderNo = lbo.leaseOrderId "
+				+ "AND lbi.lineBaseId = ? AND lbo.lineClassId = ? AND lbi.ispay = '1' AND lbo.isAboard = '1'";
+		List<AppVo_4> list2 = queryList(AppVo_4.class, sql, params);
+
+		// 保存该班次已买票的所有用户信息
+		List<AppVo_4> list3 = new ArrayList<AppVo_4>();
+		if (null != list1 && list1.size() > 0) {
+			list3.addAll(list1);
+		}
+		if (null != list2 && list2.size() > 0) {
+			list3.addAll(list2);
+		}
+		vl.setList(list3);
+
+		// 保存该班次已买票总人数
+		if (list3.size() == 0) {
+			vl.setA1("0");
+		} else {
+			vl.setA1(list3.size() + "");
+		}
+
+		// 保存该班次已买票切已上车总人数
+		if (null == list2 || list2.size() == 0) {
+			vl.setA2("0");
+		} else {
+			vl.setA2(list2.size() + "");
+		}
+
+		return vl;
+	}
+
+	/**
+	 * 反馈建议
+	 */
+	public String addFeedback(String context, String phoneNo, String userid) {
+		DriverFeedback vo = new DriverFeedback();
+		vo.setDriverId(userid);
+		vo.setFeedbackTime(MyDate.Format.DATETIME.now());
+		vo.setFeedbackContext(context);
+		vo.setPhoneNo(phoneNo);
+
+		int flag = updateData(vo,"driver_feedback", "feedbackId");
+
+		if (flag == 1) {
+			return "1";// 成功
+		} else {
+			return "2";// 失败
+		}
+	}
+
+	/**
+	 * 根据app端所传时间取最近未发车的两个班次 appCurTime app端当前时间
+	 **/
+	public List<AppVo_1> getAlarmTime(String driverId, String appCurTime) {
+		List<AppVo_1> result = new ArrayList<AppVo_1>();
+		// 查询当天的最近两个班次
+		String sql = "SELECT CONCAT(lci.orderDate,' ',lci.orderStartTime) AS a1 FROM line_class_info lci WHERE lci.driverId = ? AND lci.delflag = '0' "
+				+ "AND lci.orderdate = CURDATE() AND STR_TO_DATE(lci.orderStartTime, '%h:%i') > CURTIME() GROUP BY lci.orderStartTime ORDER BY lci.orderStartTime ASC LIMIT 0,2";
+		Object[] params = new Object[1];
+		params[0] = driverId;
+		List<AppVo_1> list = queryList(AppVo_1.class, sql, params);
+		if (null != list && list.size() > 0) {
+			result.addAll(list);
+		}
+		int len = (null == list) ? 0 : list.size();
+		if (null == list || list.size() < 2) {// 如果当天最近班次不足两个了，则查询第二天的班次补满两个
+			sql = "SELECT CONCAT(lci.orderDate,' ',lci.orderStartTime) AS a1 FROM line_class_info lci WHERE lci.driverId = ? AND lci.delflag = '0' "
+					+ "AND lci.orderdate = DATE_ADD(CURDATE(), INTERVAL 1 DAY) GROUP BY lci.orderStartTime ORDER BY lci.orderStartTime ASC LIMIT 0,"
+					+ (2 - len);
+			params = new Object[1];
+			params[0] = driverId;
+			List<AppVo_1> l = queryList(AppVo_1.class, sql, params);
+			if (null != l && l.size() > 0) {
+				result.addAll(l);
+			}
+		}
+		return result;
+	}
+
+	/** 获取司机账户余额 **/
+	public AppVo_1 getDriverAccount(String driverId) {
+		String sql = "SELECT totalAmount AS a1 FROM driver_info WHERE driverId = ?";
+		Object[] params = new Object[1];
+		params[0] = driverId;
+		AppVo_1 vo = queryBean(AppVo_1.class, sql, params);
+		return vo;
+	}
+
+	/** 获取司机账户明细 **/
+	public List<AppVo_5> getDriverAccountDetail(String driverId) {
+		String sql = "SELECT handleType AS a1,incomeType AS a2,withdrawType AS a3,amount AS a4,handleTime AS a5 FROM driver_account_detail WHERE driverId = ?";
+		Object[] params = new Object[1];
+		params[0] = driverId;
+		List<AppVo_5> list = queryList(AppVo_5.class, sql, params);
+		return list;
+	}
+
+	/** 分页查询司机评论 **/
+	public AppVo_3_list getDriverCommentInfo(String driverId,
+			String currentPage, String pageSize) {
+		// 分页查询评论信息
+		String sql = "SELECT headerPicUrl AS a1,commentType AS a2,commentContent AS a3,commentTime AS a4 FROM driver_comment_info "
+				+ "WHERE driverId = ? ORDER BY commentTime DESC";
+		Object[] params = new Object[1];
+		params[0] = driverId;
+		List<AppVo_4> list = queryByPage(AppVo_4.class, sql, Integer
+				.valueOf(currentPage), Integer.valueOf(pageSize), params);
+
+		int num1 = 0;
+		int num2 = 0;
+		if (null != list && list.size() > 0) {
+			String headerIp = PropertyManage.get("header.pic.ip");// IP地址
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setA1(headerIp + "/" + list.get(i).getA1());// 补全头像路径
+			}
+
+			// 查询司机被点赞数
+			sql = "SELECT id FROM driver_comment_info WHERE driverId = ? AND commentType = '1'";
+			num1 = queryCount(sql, params);
+			// 查询司机被评论数
+			sql = "SELECT id FROM driver_comment_info WHERE driverId = ? AND commentType = '2'";
+			num2 = queryCount(sql, params);
+		}
+
+		AppVo_3_list vl = new AppVo_3_list();
+		vl.setA2(num1 + "");
+		vl.setA3(num2 + "");
+		vl.setList(list);
+		return vl;
+	}
+
+	/** 根据订单号返回订单明细 id和司机im用户id **/
+	public AppVo_2 getOrderDetailId(String orderNo) {
+		// 查询当前班次对应的订单明细id和司机im用户id，这两个值将用户乘客确认上车
+		String s = "SELECT lbo.localId AS a1,iui.userId AS a2 FROM line_business_order lbo,line_class_info lci,im_user_info iui "
+				+ "WHERE lbo.lineClassId = lci.lineClassId AND lci.driverId = iui.passengerId AND lbo.leaseOrderId = ? AND lci.orderDate = CURDATE()";
+		Object[] params = new Object[1];
+		params[0] = orderNo;
+		AppVo_2 vo2 = queryBean(AppVo_2.class, s, params);
+		return vo2;
+	}
+
+	/**
+	 * 获取司机端android版本号
+	 */
+	public AppVo_5 getDriverVersion() {
+		String sql = "SELECT vsn as a1,url as a2,flag as a3,ismust as a4,info as a5 FROM app_version WHERE TYPE = '0' and apptype = '2' ORDER BY flag DESC LIMIT 0,1";
+		AppVo_5 vo = queryBean(AppVo_5.class, sql);
+		return vo;
+	}
+
+	/** 添加司机提现申请 **/
+	public int addDriverWithdrawAskfor(DriverWithdrawAskfor dwa) {
+		// 保存提现申请
+		int flag = updateData(dwa, "driver_withdraw_askfor","id");
+		if (flag == 1) {
+			// 保存账户明细
+			DriverAccountDetail dad = new DriverAccountDetail();
+			dad.setDriverId(dwa.getDriverId());
+			dad.setHandleType("2");
+			dad.setWithdrawType(dwa.getWithdrawType());
+			dad.setAmount(dwa.getAmount());
+			dad.setHandleTime(MyDate.Format.DATETIME.now());
+			flag = updateData(dad,"driver_account_detail", "id");
+			if (flag == 1) {
+				// 修改司机账户总金额
+				String sql = "UPDATE `driver_info` SET `totalAmount` = totalAmount-? WHERE `driverId` = ?";
+				Object[] params = new Object[2];
+				params[0] = dwa.getAmount();
+				params[1] = dwa.getDriverId();
+				flag = executeSQL(sql, params);
+			}
+		}
+		return flag;
+	}
+
+	@Override
+	public int updateGpsInfo(String gpsNo, String time, String lon, String lat, String speed, String angle) {
+		String qsql = "SELECT gpsno AS a1 FROM gps_info WHERE gpsno= ?";
+		AppVo_1 vo1 = queryBean(AppVo_1.class, qsql, gpsNo);
+		if (vo1 != null && vo1.getA1() != null) {
+			int num=0;
+			Connection conn = null;
+			try {
+				conn = Conn.get();
+				conn.setAutoCommit(false);
+				QueryRunner qr = new QueryRunner();
+				num=qr.update(conn, "UPDATE gps_info SET gpsno=?,time=?,lon=?,lat=?,speed=?,angle=? WHERE gpsno=?", 
+						gpsNo, time, lon, lat, speed, angle, gpsNo);
+				conn.commit();
+			}catch(Exception e){
+				try {
+					conn.rollback();
+					logger.error("Check order failed.", e);
+				} catch (SQLException e1) {
+					e1.printStackTrace();
+				}
+			}
+			return num;
+		} else {
+			String isql = "INSERT INTO `gps_info` "
+					+ "(`gpsno`, `time`, `lon`,`lat`,`speed`, `angle`) "
+					+ "VALUES(?,?,?,?,?,?)";
+			return executeSQL(isql, gpsNo, time, lon, lat, speed, angle);
+		}
+
+	}
+
+	/**
+	 * 司机端消息列表
+	 */
+	public List<AppVo_8> msgList(String driverId, String currentPage,
+			String pageSize) {
+		String sql = "SELECT a.localid AS a1 ,a.userid AS a2,a.msgid AS a3,a.readflag AS a4,a.sendtime AS a5,b.msgtitle AS a6,b.msgcontext AS a7,msgSubType as a8 FROM "
+				+ "sys_msg_user a ,sys_msg_info b WHERE a.msgid = b.msgid AND a.userid = ? AND b.msgType = '1' AND b.issend = '0' and b.msgTarget = '1' and b.theModule = '4' "
+				+ "ORDER BY a.readFlag ASC, a.sendtime DESC";
+		Object[] params = new Object[1];
+		params[0] = driverId;
+		List<AppVo_8> list = queryByPage(AppVo_8.class, sql, Integer
+				.valueOf(currentPage), Integer.valueOf(pageSize), params);
+		return list;
+	}
+
+	/**
+	 * 重置未加密的司机密码
+	 */
+	public int updateDriverPassword() {
+		String sql = "SELECT telephone AS a1,PASSWORD AS a2 FROM driver_info WHERE comments IS NULL";
+		List<AppVo_2> list = queryList(AppVo_2.class, sql);
+		int flag = 0;
+		if (null != list && list.size() > 0) {
+			String sql_t = null;
+			for (AppVo_2 vo : list) {
+				if (vo.getA2().length() == 6) {
+					sql_t = "update driver_info set passWord = ?,comments=? where telephone = ?";
+					Object[] params = new Object[3];
+					params[0] = Sha1Utils.encrypt(vo.getA1() + "&" + vo.getA2());// 密码加密规则：手机号码+"&"+密码
+					params[1] = DESCryptUtil.des(vo.getA1() + "&" + vo.getA2());
+					params[2] = vo.getA1();
+					flag = executeSQL(sql_t, params);
+				}
+			}
+		}
+		return flag;
+	}
+
+}

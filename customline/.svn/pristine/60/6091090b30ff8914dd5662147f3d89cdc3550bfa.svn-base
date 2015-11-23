@@ -1,0 +1,136 @@
+package com.amwell.vo.coupon;
+
+/**
+ * 组合券发放信息
+ * @author gxt
+ *
+ */
+public class CouponGroupGrant {
+	private String id;//int(11) NOT NULL主键ID
+	private String taskName;//任务名称
+	private String couponGroupId;//int(11) NOT NULL组合券批次号
+	private String couponGroupName;// varchar(35) NULL COMMENT '组合券名称',
+	private String selectPass;//tinyint(4) NOT NULL选择用户 0:全部用户 1:老用户 2:新用户
+	private String sendCouponType;//varchar(8) NULL发放方式 user get:用户领取 sys send:系统发放
+	private String startTime;//varchar(19) NULL可领取组合券开始时间
+	private String endTime;//varchar(19) NULL可领取组合券结束时间
+	private String modeOfExecution;//varchar(6) NULL执行方式 unsend:未发放  send:发放 closed:关闭
+	private String createBy;//varchar(35) NOT NULL创建人
+	private String createOn;//varchar(19) NOT NULL创建时间
+	private String updateBy;//varchar(35) NULL修改人
+	private String updateOn;//varchar(19) NULL修改时间
+	
+	private String userName;//用户名
+	private String updateUserName;
+	private String rules;//规则信息（格式：规则名1,条件1,条件值1#规则名2,条件2,条件值2）
+	public String getId() {
+		return id;
+	}
+	public void setId(String id) {
+		this.id = id;
+	}
+	public String getCouponGroupId() {
+		return couponGroupId;
+	}
+	public void setCouponGroupId(String couponGroupId) {
+		this.couponGroupId = couponGroupId;
+	}
+	public String getSelectPass() {
+		return selectPass;
+	}
+	public void setSelectPass(String selectPass) {
+		this.selectPass = selectPass;
+	}
+	public String getSendCouponType() {
+		//user get:用户领取 sys send:系统发放
+		/*if("user get".equals(this.sendCouponType)){
+			this.sendCouponType="用户领取";
+		}
+		else if("sys send".equals(this.sendCouponType)){
+			this.sendCouponType="系统发放";
+		}*/
+		return sendCouponType;
+	}
+	public void setSendCouponType(String sendCouponType) {
+		this.sendCouponType = sendCouponType;
+	}
+	public String getStartTime() {
+		return startTime;
+	}
+	public void setStartTime(String startTime) {
+		this.startTime = startTime;
+	}
+	public String getEndTime() {
+		return endTime;
+	}
+	public void setEndTime(String endTime) {
+		this.endTime = endTime;
+	}
+	public String getModeOfExecution() {
+		//send:发放 closed:关闭
+		/*if("send".equals(this.modeOfExecution)){
+			this.modeOfExecution="发放";
+		}
+		else if("closed".equals(this.modeOfExecution)){
+			this.modeOfExecution="关闭";
+		}*/
+		return modeOfExecution;
+	}
+	public void setModeOfExecution(String modeOfExecution) {
+		this.modeOfExecution = modeOfExecution;
+	}
+	public String getCreateBy() {
+		return createBy;
+	}
+	public void setCreateBy(String createBy) {
+		this.createBy = createBy;
+	}
+	public String getCreateOn() {
+		return createOn;
+	}
+	public void setCreateOn(String createOn) {
+		this.createOn = createOn;
+	}
+	public String getUpdateBy() {
+		return updateBy;
+	}
+	public void setUpdateBy(String updateBy) {
+		this.updateBy = updateBy;
+	}
+	public String getUpdateOn() {
+		return updateOn;
+	}
+	public void setUpdateOn(String updateOn) {
+		this.updateOn = updateOn;
+	}
+	public String getCouponGroupName() {
+		return couponGroupName;
+	}
+	public void setCouponGroupName(String couponGroupName) {
+		this.couponGroupName = couponGroupName;
+	}
+	public String getUserName() {
+		return userName;
+	}
+	public void setUserName(String userName) {
+		this.userName = userName;
+	}
+	public String getRules() {
+		return rules;
+	}
+	public void setRules(String rules) {
+		this.rules = rules;
+	}
+	public String getUpdateUserName() {
+		return updateUserName;
+	}
+	public void setUpdateUserName(String updateUserName) {
+		this.updateUserName = updateUserName;
+	}
+	public String getTaskName() {
+		return taskName;
+	}
+	public void setTaskName(String taskName) {
+		this.taskName = taskName;
+	}
+}

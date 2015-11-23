@@ -1,0 +1,293 @@
+package com.pig84.ab.dao.impl;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Repository;
+
+import com.pig84.ab.dao.BaseDao;
+import com.pig84.ab.dao.IGiftDao;
+import com.pig84.ab.utils.IdGenerator;
+import com.pig84.ab.utils.MyDate;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_11;
+import com.pig84.ab.vo.bean.AppVo_1_list;
+import com.pig84.ab.vo.bean.AppVo_2;
+import com.pig84.ab.vo.bean.AppVo_7;
+
+/**
+ * 优惠券相关
+ * @author 
+ *
+ */
+@Repository
+public class GiftDaoImpl extends BaseDao implements IGiftDao {
+	
+	/**查询待领取优惠券，同时系统自动领取上下线时间段的系统优惠券**/
+	public AppVo_1_list saveSysGiftInfo(String passengerId,String telephone,String couponType,int pageSize,int currentPage){
+		AppVo_1_list vl=new AppVo_1_list();
+		//获取未查看优惠券数量
+		String theStr="SELECT * FROM gf_coupon_passenger WHERE telephone = ? and getState = '1' AND lookState = '0'";
+		Object[] params =new Object[1];
+		params[0]=telephone;
+		vl.setA1(queryCount(theStr,params)+"");
+		
+		List<AppVo_7> resuleList=new ArrayList<AppVo_7>();
+		List<AppVo_7> voList=null;
+		
+		//根据用户id查询用户信息
+		String str1="SELECT provinceCode AS a1,cityCode AS a2 FROM passenger_info WHERE passengerId = ?";
+		params=new Object[1];
+		params[0]=passengerId;
+		AppVo_2 vo_2=queryBean(AppVo_2.class, str1,params);
+		
+		//系统自动领取上下线时间段的系统优惠券
+//		-- 查询在上下线时间以内的用户类型不为自定义用户的系统发放优惠券        
+		List<String> condition=new ArrayList<String>();
+		condition.add("0");
+		condition.add(couponType);
+		String sql="SELECT gc.sendCouponType as a1,gcg.couponGiftId as a2,gc.selectPass as a3,gc.downLineTime as a4,gc.limitNum as a5," +
+				"gg.giftValue as a6,gg.giftCon as a7,gg.giftType as a8,LEFT(gc.effectiveTime,10) as a9,LEFT(gc.expirationTime,10) as a10,gc.issueNum as a11 " +
+				"FROM gf_coupon gc,gf_coupon_gift gcg,gf_gifts gg " +
+		"WHERE gc.couponId = gcg.couponId and gcg.giftPriId = gg.giftPriId and gc.couponType IN(?,?) AND gc.upLineTime <= NOW() " +
+				"AND gc.downLineTime >= NOW() and gc.expirationTime > NOW()";
+		if(null!=vo_2){
+			if(null!=vo_2.getA1()&&!"".equals(vo_2.getA1())){
+				sql=sql+" and gc.provinceCode = ? ";
+				condition.add(vo_2.getA1());
+			}
+			if(null!=vo_2.getA2()&&!"".equals(vo_2.getA2())){
+				sql=sql+" and gc.cityCode = ? ";
+				condition.add(vo_2.getA2());
+			}
+		}
+		sql=sql+" order by gc.createOn desc";
+
+		List<AppVo_11> list=queryList(AppVo_11.class, sql,condition.toArray());
+		if(null!=list&&list.size()>0){
+			voList=new ArrayList<AppVo_7>();
+			AppVo_7 vo=null;
+			
+			for (AppVo_11 appVo_11 : list) {
+				//发放方式
+				String sendCouponType=appVo_11.getA1();
+				//优惠券礼品的主键ID
+				String couponGiftId=appVo_11.getA2();
+				//用户类型
+				String selectPass=appVo_11.getA3();
+				//下线时间
+				String downLineTime=appVo_11.getA4();
+				//限领数量
+				int limitNum=Integer.parseInt(appVo_11.getA5());
+				//发行数量
+				int issueNum=Integer.parseInt(appVo_11.getA11());
+				
+				/**************************判断登录用户所属类型******************************************/
+				boolean flag1=false;//是否属于全部用户
+				boolean flag2=false;//是否属于新用户
+				if(selectPass.equals("0")){
+//					-- 如果用户类型为全部用户，则判断登录用户是否属于全部用户（在下线时间之前注册的用户都属于全部用户）
+					sql="SELECT pf.* FROM passenger_info pf WHERE pf.telephone = ? AND pf.registerTime <= ?";
+					params=new Object[2];
+					params[0]=telephone;
+					params[1]=downLineTime;
+					if(queryCount(sql,params)>0){
+						flag1=true;
+					}
+				}
+				
+				if(selectPass.equals("1")){
+//					-- 如果用户类型为新用户，则判断登录用户是否属于新用户（在下线时间之前注册的并没有买过票的用户属于新用户）
+					sql="SELECT pf.* FROM passenger_info pf WHERE pf.telephone = ? AND pf.registerTime <= ? " +
+							"AND pf.passengerId NOT IN(SELECT DISTINCT lbi.passengerId FROM lease_base_info lbi WHERE lbi.ispay = '1')";
+					params=new Object[2];
+					params[0]=telephone;
+					params[1]=downLineTime;
+					if(queryCount(sql,params)>0){
+						flag2=true;
+					}
+				}
+				/**************************判断登录用户所属类型******************************************/
+				
+				/**************************发放系统优惠券************************************************/
+				//发放方式 1:用户领取 2:系统发放
+				if(sendCouponType.equals("2")){
+					//判断对应用户的优惠券是否已经发放完
+					String str="SELECT * FROM gf_coupon_passenger WHERE telephone = ? AND couponGiftId = ?";
+					params=new Object[2];
+					params[0]=telephone;
+					params[1]=couponGiftId;
+					int theCount=queryCount(str,params);
+					int insertCount=limitNum-theCount;
+					if(insertCount>0 && (flag1 || flag2)){
+//							-- 如果登录用户属于全部用户或者新用户，则判断需要给登录用户发放几份系统优惠券 
+//							-- 循环发放系统优惠券
+						for (int i = 0; i < insertCount; i++) {
+							sql = " INSERT INTO gf_coupon_passenger(counponTeleId,passengerId,telephone,couponGiftId,getState,useState,getTime) " +
+									"VALUES(?,?,?,?,?,?,?) ";
+							List<String> conds = new ArrayList<String>();
+							conds.add(IdGenerator.seq());
+							conds.add(passengerId);//用户Id
+							conds.add(telephone);//用户电话号码
+							conds.add(couponGiftId);//优惠券礼品的主键ID
+							conds.add("1");//0:未领取 1：已领取
+							conds.add("0");//使用状态 0:未使用 1:已使用 2:已过期
+							conds.add(MyDate.Format.DATETIME.now());//领取时间
+							executeSQL(sql, conds.toArray());
+						}
+					}
+				}
+				/**************************发放系统优惠券************************************************/
+				
+				/**************************获取用户待领取优惠券并返回页面*********************************/
+				//发放方式 1:用户领取 2:系统发放
+				if(sendCouponType.equals("1")){
+					//判断领取量是否达到发行数量，如果达到，则在页面上不显示
+					String str="SELECT * FROM gf_coupon_passenger WHERE couponGiftId = ?";
+					params=new Object[1];
+					params[0]=couponGiftId;
+					int theCount=queryCount(str,params);
+					if(theCount<issueNum){
+						str="SELECT * FROM gf_coupon_passenger WHERE telephone = ? AND couponGiftId = ?";
+						params=new Object[2];
+						params[0]=telephone;
+						params[1]=couponGiftId;
+						theCount=queryCount(str,params);
+						int insertCount=limitNum-theCount;
+						if(insertCount>0&&(flag1||flag2)){
+							//判断登录用户领取量是否达到限领数量，如果达到，则在页面上不显示
+							vo=new AppVo_7();
+							vo.setA1(appVo_11.getA6());//礼品面值
+							vo.setA2(appVo_11.getA7());//约束条件
+							vo.setA3(appVo_11.getA8());//礼类类型:1:通用型礼品（班车、包车、拼车通用）2:上下班班车礼品 3:包车礼品 4:拼车礼品
+							vo.setA4(appVo_11.getA9());//使用的有效时间(开始)
+							vo.setA5(appVo_11.getA10());//使用的有效时间(结束)
+							vo.setA6(insertCount+"");//单个人 剩余可领数量
+							vo.setA7(couponGiftId);//优惠券礼品关系表id
+							voList.add(vo);
+						}
+					}
+					
+					//判断自定义用户对应的优惠券是否还有未领取的
+					str="SELECT * FROM gf_coupon_passenger gcp WHERE gcp.getState = '0' AND gcp.telephone = ? AND gcp.couponGiftId = ?";
+					params=new Object[2];
+					params[0]=telephone;
+					params[1]=couponGiftId;
+					theCount=queryCount(str,params);
+					if(theCount>0){
+						//如果自定义用户还有对应的优惠券未领取，则显示到页面
+						vo=new AppVo_7();
+						vo.setA1(appVo_11.getA6());//礼品面值
+						vo.setA2(appVo_11.getA7());//约束条件
+						vo.setA3(appVo_11.getA8());//礼类类型:1:通用型礼品（班车、包车、拼车通用）2:上下班班车礼品 3:包车礼品 4:拼车礼品
+						vo.setA4(appVo_11.getA9());//使用的有效时间(开始)
+						vo.setA5(appVo_11.getA10());//使用的有效时间(结束)
+						vo.setA6(theCount+"");//自定义用户剩余未领取数量
+						vo.setA7(couponGiftId);//优惠券礼品关系表id
+						voList.add(vo);
+					}
+				}
+				/**************************获取用户待领取优惠券并返回页面*********************************/
+			}
+		}
+		
+		if(null!=voList&&voList.size()>0){
+			int end=pageSize*currentPage+pageSize;
+			end= end<=voList.size() ?end:voList.size();
+			for (int i = pageSize*currentPage; i < end; i++) {
+				resuleList.add(voList.get(i));
+			}
+			vl.setList(resuleList);
+		}
+		return vl;
+	}
+	
+	/**领取优惠券，保存优惠券领取信息并返回剩余可领取状态**/
+	public AppVo_2 saveCouponPassenger(String passengerId,String telephone,String couponGiftId){
+		AppVo_2 vo_2=new AppVo_2();
+		//获取未查看优惠券数量
+		String theStr="SELECT * FROM gf_coupon_passenger WHERE telephone = ? AND lookState = '0' and getState = '1'";
+		Object[] params =new Object[1];
+		params[0]=telephone;
+		vo_2.setA2(queryCount(theStr,params)+"");
+		
+		//判断优惠券是否已下线
+		String sql="SELECT gc.sendCouponType as a1,gcg.couponGiftId as a2,gc.selectPass as a3,gc.downLineTime as a4,gc.limitNum as a5," +
+		"gg.giftValue as a6,gg.giftCon as a7,gg.giftType as a8,gc.effectiveTime as a9,gc.expirationTime as a10,gc.issueNum as a11 " +
+		"FROM gf_coupon gc,gf_coupon_gift gcg,gf_gifts gg " +
+        "WHERE gc.couponId = gcg.couponId and gcg.giftPriId = gg.giftPriId AND gc.upLineTime <= NOW() " +
+		"AND gc.downLineTime >= NOW() and gcg.couponGiftId = ?";
+		params=new Object[1];
+		params[0]=couponGiftId;
+		// AND gc.selectPass <> '3'
+		AppVo_11 vo_11=queryBean(AppVo_11.class, sql,params);
+		if(null==vo_11){
+			vo_2.setA1("-4");//优惠券未上线或已下线
+			return vo_2;
+		}
+		//如果没下线，判断是否已领完
+		String str="SELECT * FROM gf_coupon_passenger WHERE couponGiftId = ?";
+		params=new Object[1];
+		params[0]=couponGiftId;
+		if(vo_11.getA3().equals("3")){//自定义用户优惠券
+			str=str+" and getState = '1'";
+		}
+		int theCount=queryCount(str,params);
+		if(theCount - Integer.parseInt(vo_11.getA11())==0){
+			vo_2.setA1("-3");//优惠券已领完
+			return vo_2;
+		}
+		//如果没领完，判断登录用户是否还有领取机会
+		str="SELECT * FROM gf_coupon_passenger WHERE telephone = ? AND couponGiftId = ? and getState = '1'";
+		params=new Object[2];
+		params[0]=telephone;
+		params[1]=couponGiftId;
+		theCount=queryCount(str,params);
+		int insertCount=Integer.parseInt(vo_11.getA5())-theCount;
+		if(insertCount==0){
+			vo_2.setA1("-2");//个人优惠券领取机会已用完
+			return vo_2;
+		}
+		//如果有领取机会，则领取一张
+		int flag=0;
+		str="SELECT counponTeleId as a1 FROM gf_coupon_passenger WHERE telephone = ? AND couponGiftId = ? and getState = '0' LIMIT 0,1";
+		AppVo_1 vo_1=queryBean(AppVo_1.class, str,params);
+		if(null!=vo_1&&null!=vo_1.getA1()&&!"".equals(vo_1.getA1())){
+			str="UPDATE gf_coupon_passenger SET getState = '1',getTime = NOW() WHERE counponTeleId = ?";
+			params=new Object[1];
+			params[0]=vo_1.getA1();
+			flag=executeSQL(str,params);
+		}
+		else{
+			sql = " INSERT INTO gf_coupon_passenger(counponTeleId,passengerId,telephone,couponGiftId,getState,useState,getTime) " +
+			"VALUES(?,?,?,?,?,?,?) ";
+			List<String> conds = new ArrayList<String>();
+			conds.add(IdGenerator.seq());
+			conds.add(passengerId);//用户Id
+			conds.add(telephone);//用户电话号码
+			conds.add(couponGiftId);//优惠券礼品的主键ID
+			conds.add("1");//0:未领取 1：已领取
+			conds.add("0");//使用状态 0:未使用 1:已使用 2:已过期
+			conds.add(MyDate.Format.DATETIME.now());//领取时间
+			flag = executeSQL(sql, conds.toArray());
+	
+		}
+		if(flag==0){
+			vo_2.setA1("-1");//领取优惠券失败
+			return vo_2;
+		}
+		vo_2.setA1((insertCount-1)+"");//返回剩余领取机会
+		vo_2.setA2((Integer.parseInt(vo_2.getA2())+1)+"");
+		return vo_2;
+	}
+	
+	/**获取报价信息**/
+	public AppVo_1 getCouponValueById(String counponTeleId){
+		String sql="SELECT gg.giftValue AS a1 FROM gf_coupon_passenger gcp,gf_coupon_gift gcg,gf_gifts gg " +
+				"WHERE gcp.couponGiftId = gcg.couponGiftId AND gcg.giftPriId = gg.giftPriId AND gcp.counponTeleId = ?";
+		Object[] params = new Object[1];
+		params[0]=counponTeleId;
+		return queryBean(AppVo_1.class, sql,params);
+	}
+
+}

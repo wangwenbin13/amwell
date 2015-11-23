@@ -1,0 +1,596 @@
+package com.amwell.action.advertise;
+
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import javax.imageio.ImageIO;
+import javax.servlet.http.HttpSession;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+import org.apache.struts2.ServletActionContext;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.apache.struts2.json.JSONException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
+import org.springframework.util.CollectionUtils;
+
+import com.amwell.action.BaseAction;
+import com.amwell.commons.HttpFileUpload;
+import com.amwell.commons.JsonWriter;
+import com.amwell.commons.MyDate;
+import com.amwell.commons.PropertyManage;
+import com.amwell.commons.StringUtil;
+import com.amwell.entity.Page;
+import com.amwell.service.IAdManageService;
+import com.amwell.service.IGiftService;
+import com.amwell.vo.AdvertImageVo;
+import com.amwell.vo.AdvertManageVo;
+import com.amwell.vo.AppVersionVo;
+import com.amwell.vo.SysAdminVo;
+import com.amwell.vo.ftp.ParamFtp;
+
+/**
+ * 广告管理
+ * 
+ */
+@ParentPackage("user-finit")
+@Namespace("/adManageAction")
+@Scope("prototype")
+public class AdManageAction extends BaseAction {
+
+	private Logger logger = Logger.getLogger(AdManageAction.class);
+
+	private static final long serialVersionUID = -4871647478527217326L;
+
+	@Autowired
+	private IAdManageService adManageService;
+
+	@Autowired
+	private IGiftService giftService;
+
+	private List<AppVersionVo> versionVoList;
+
+	// 获取实际文件数据
+	private File adImage;
+
+	// 文件名
+	private String adImageFileName;
+
+	// 文件类型
+	private String adImageContentType;
+
+	// 上传可接受的文件类型
+	private static final String[] ACCEPT_FILE_TYPES = new String[] { "jpg", "png", "jpeg", "gif", "bmp" };
+
+	private static final String[] picResolution = new String[] { "178*720", "270*1080", "288*1080", "128*480","480*1080","320*1080","240*720","160*480" };
+	
+	private static final String[] picResolution_sign = new String[] { "720*178", "1080*270", "1080*288", "480*128","1080*480","1080*320","720*240","480*160" };
+
+	private static final String[] iosPic = new String[] { "140*520", "180*640","300*640" };
+	
+	private static final String[] iosPic_sign = new String[] { "520*140", "640*180","640*300" };
+	private int currentPageIndex = 0;
+
+	private int pageSize = 5;
+
+	private AdvertManageVo adModel;
+
+	private List<AdvertImageVo> imageList;
+	
+	List<String> picSign = new ArrayList<String>();
+
+	/**
+	 * 查询广告列表
+	 * 
+	 * @return
+	 * @throws Exception
+	 */
+	@SuppressWarnings("rawtypes")
+	@Action(value = "getAdManageList", results = {
+			@Result(name = "success", location = "../../view/advertise/advertiseList.jsp") })
+	public String getAdManageList() throws Exception {
+		Object cpi = session.get("toDetailCurrentPageIndex");
+		if (null != cpi) {
+			if (cpi instanceof Integer) {
+				currentPageIndex = (Integer) cpi;
+				session.remove("toDetailCurrentPageIndex");
+			}
+		} else {
+			String currentPageIndexStr = request.getParameter("currentPageIndex");
+			currentPageIndex = currentPageIndexStr == null ? 0
+					: Integer.parseInt(currentPageIndexStr);
+		}
+		map = adManageService.getAdManage(search, currentPageIndex, pageSize);
+		list = (List) map.get("list");// 数据对象
+		page = (Page) map.get("page");// 分页对象
+		return SUCCESS;
+
+	}
+
+	/**
+	 * 添加页面跳转
+	 * 
+	 * @return
+	 */
+	@Action(value = "addPageJump", results = {@Result(name = "success", location = "../../view/advertise/pop-advertAdd.jsp") })
+	public String addPageJump() {
+		versionVoList = adManageService.getVersion();
+		return SUCCESS;
+
+	}
+
+	/**
+	 * 添加广告信息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "addAdManage", results = { @Result(type = "json") })
+	public void addAdManage() throws IOException {
+		AdvertManageVo advertManageVo = createAdvertManageVo();
+		List<AdvertImageVo> advertImageVoList = createAdvertImageList(advertManageVo);
+		if (false == CollectionUtils.isEmpty(advertImageVoList)) {
+			// 生成缩略图
+			for (AdvertImageVo advertImageVo : advertImageVoList) {
+				if (!"".equals(advertImageVo.getImageUrl())) {
+					advertManageVo.setThumbnail(advertImageVo.getImageUrl());
+					break;
+				}
+			}
+		}
+		int flag = adManageService.addAdManage(advertManageVo, advertImageVoList);
+		String json = flag > 0 ? "success" : "error";
+		// 添加日志
+		if (flag > 0) {
+			giftService.addSysLog(flag, advertManageVo.getOperateBy(), "广告添加");
+		} else {
+			giftService.addSysLog(flag, advertManageVo.getOperateBy(), "广告添加");
+		}
+		getResponse().setContentType("text/html;charset=UTF-8");
+		getResponse().getWriter().print(json);
+	}
+
+	private AdvertManageVo createAdvertManageVo() {
+		AdvertManageVo advertManageVo = new AdvertManageVo();
+		String clientType = request.getParameter("clientType");
+		if (StringUtils.isNotBlank(clientType)) {
+			advertManageVo.setClientType(Integer.parseInt(clientType));
+		}
+		advertManageVo.setEffectiveTime(request.getParameter("effectiveTime"));
+		advertManageVo.setExpirationTime(request.getParameter("expirationTime"));
+		advertManageVo.setAdTitle(request.getParameter("adTitle"));
+		advertManageVo.setUrlSign(Integer.valueOf(request.getParameter("urlSign") == null ? "2" : request.getParameter("urlSign")));
+		HttpSession httpSession = ServletActionContext.getRequest().getSession();
+		SysAdminVo admin = (SysAdminVo) httpSession.getAttribute("userInfo");// 登录用帐号资料
+		String userId = admin == null ? "" : admin.getUserId();
+		advertManageVo.setOperateBy(userId);
+		advertManageVo.setOperateOn(MyDate.getMyDateLong());
+		String urlLink = request.getParameter("urlLink");
+		if (StringUtils.isNotBlank(urlLink)) {
+			advertManageVo.setUrlLink(urlLink);
+		}
+		String[] versionNO = request.getParameterValues("versionNO");
+		if (ArrayUtils.isNotEmpty(versionNO)) {
+			StringBuffer res = new StringBuffer();
+			for (String s : versionNO) {
+				res.append(s).append(",");
+			}
+			if (res != null) {
+				advertManageVo.setVersionNO(res.substring(0, res.length() - 1));
+			}
+		}
+		String ad_id = request.getParameter("ad_id");
+		if (StringUtils.isNotBlank(ad_id)) {
+			// 更新数据
+			advertManageVo.setAd_id(ad_id);
+		} else {
+			// 新增数据
+			advertManageVo.setAd_id(StringUtil.generateSequenceNo());
+		}
+		return advertManageVo;
+	}
+
+	private List<AdvertImageVo> createAdvertImageList(AdvertManageVo advertManageVo) {
+		List<AdvertImageVo> advertImageVoList = new ArrayList<AdvertImageVo>();
+		String[] imageUrl = request.getParameterValues("imageUrl");
+		List<String> imageUrlList = new ArrayList<String>();
+		if (advertManageVo.getClientType() == 1) {
+			int j = picResolution.length;
+			for (int i = 0; i < j; i++) {
+				if(imageUrl.length>i){
+					imageUrlList.add(imageUrl[i]);
+				}else{
+					imageUrlList.add("0");
+				}
+			}
+		} else if (advertManageVo.getClientType() == 2) {
+			int j = iosPic.length;
+			for (int i = 0; i < j; i++) {
+					if(imageUrl.length>i){
+						imageUrlList.add(imageUrl[i]);
+					}else{
+						imageUrlList.add("0");
+					}
+			}
+		}
+		AdvertImageVo advertImageVo = null;
+		if (ArrayUtils.isNotEmpty(imageUrl)) {
+			for (int i = 0; i < imageUrlList.size(); i++) {
+				advertImageVo = new AdvertImageVo();
+				advertImageVo.setAdConfigId(advertManageVo.getAd_id());
+				advertImageVo.setImage_id(StringUtil.generateSequenceNo());
+				if (advertManageVo.getClientType() == 2) {
+					advertImageVo.setImageResolution(iosPic[i]);
+				} else {
+					advertImageVo.setImageResolution(picResolution[i]);
+				}
+				if ("0".equals(imageUrlList.get(i))) {
+					advertImageVo.setImageUrl("");
+				} else {
+					advertImageVo.setImageUrl(imageUrlList.get(i));
+				}
+				advertImageVoList.add(advertImageVo);
+			}
+		}
+		return advertImageVoList;
+	}
+
+	/**
+	 * 查询广告详情
+	 * 
+	 * @return
+	 * @throws IOException 
+	 */
+	@SuppressWarnings("unchecked")
+	@Action(value = "getAdManageDetails", results = {@Result(name = "success", location = "../../view/advertise/advertiseDetail.jsp") })
+	public String getAdManageDetails() throws IOException {
+		int client=0;
+		
+		versionVoList = adManageService.getVersion();
+		String adId = request.getParameter("adId");
+		if (StringUtils.isNotBlank(adId)) {
+			Map<String, Object> result = this.adManageService.getAdManageDetail(adId);
+			if (false == result.isEmpty()) {
+				adModel = (AdvertManageVo) result.get("adModel");
+				client=adModel.getClientType();
+				imageList = (List<AdvertImageVo>) result.get("picList");
+				//判断选中的版本号,选中标识1;
+				String adVsn = adModel.getVersionNO() == null ? "0" : adModel.getVersionNO();
+				String[] vsns = adVsn.split(",");
+				for (int i = 0; i < vsns.length; i++) {
+					for (int j = 0; j < versionVoList.size(); j++) {
+						if (vsns[i].equals(versionVoList.get(j).getVsn())) {
+							versionVoList.get(j).setIfChecked("1");
+						}
+					}
+				}
+			}
+		}
+		//转换分辨率页面显示格式(长*宽)
+		for(AdvertImageVo vo : imageList){
+			String[] i = vo.getImageResolution().split("[*]");
+			if(i!=null && i.length>1){
+				vo.setImageResolution(i[1]+"*"+i[0]);
+			}
+		}
+		getSession().put("toDetailCurrentPageIndex", currentPageIndex);
+		return SUCCESS;
+
+	}
+
+	/**
+	 * 广告详情编辑
+	 * 
+	 * @return
+	 * @throws IOException
+	 * @throws ParseException
+	 */
+	@Action(value = "editAdManage", results = { @Result(type = "json") })
+	public void editAdManage() throws IOException, ParseException {
+		String json = "error";
+		AdvertManageVo advertManageVo = createAdvertManageVo();
+		List<AdvertImageVo> advertImageVoList = createAdvertImageList(advertManageVo);
+		if (false == CollectionUtils.isEmpty(advertImageVoList)) {
+			// 生成缩略图
+			for (AdvertImageVo advertImageVo : advertImageVoList) {
+				if (!"".equals(advertImageVo.getImageUrl())) {
+					advertManageVo.setThumbnail(advertImageVo.getImageUrl());
+					break;
+				}
+			}
+		}
+		String nowTime = MyDate.getMyDateLong();
+		String beginTime = advertManageVo.getEffectiveTime() + ":00";
+		SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		Date dateTime1 = df.parse(nowTime);
+		Date dateTime2 = df.parse(beginTime);
+		int count = dateTime1.compareTo(dateTime2);
+		if (count < 0) {
+			advertManageVo.setAdStatus(0);
+		} else {
+			advertManageVo.setAdStatus(1);
+		}
+		int flag = adManageService.updateAdManage(advertManageVo, advertImageVoList);
+		json = flag > 0 ? "success" : "error";
+		// 添加日志
+		if (flag > 0) {
+			giftService.addSysLog(flag, advertManageVo.getOperateBy(), "广告修改");
+		} else {
+			giftService.addSysLog(flag, advertManageVo.getOperateBy(), "广告修改");
+		}
+		getResponse().setContentType("text/html;charset=UTF-8");
+		getResponse().getWriter().print(json);
+	}
+
+	/**
+	 * 上传
+	 * 
+	 * @return
+	 * @throws IOException
+	 * @throws JSONException
+	 */
+	@Action(value = "upLoad", results = { @Result(type = "json") })
+	public void upLoad() throws IOException {
+		FileInputStream fis1 = null;
+		FileInputStream fis2 = null;
+		try {
+			getResponse().setContentType("text/html;charset=UTF-8");
+			PrintWriter writer = super.getResponse().getWriter();
+			int s = Integer.parseInt(request.getParameter("size"));
+			String clientType = request.getParameter("clientType");
+			ParamFtp retFtp = new ParamFtp();
+			fis1 = new FileInputStream(adImage);
+			fis2 = new FileInputStream(adImage);
+			int size = fis2.available();
+			BufferedImage pic = ImageIO.read(fis1);
+			int width = pic.getWidth(); // 像素
+			int height = pic.getHeight(); // 像素
+			String resolution = height + "*" + width;
+			if ("1".equals(clientType) && !resolution.equals(picResolution[s - 1])) {
+				writer.print("errorResolution");
+			} else if ("2".equals(clientType) && !resolution.equals(iosPic[s - 1])) {
+				writer.print("errorResolution");
+			} else {
+				if (StringUtils.isEmpty(adImageFileName)) {
+					writer.print("error");
+				} else {
+					String lowerPhotoFileName = StringUtils.lowerCase(adImageFileName);
+					if (!FilenameUtils.isExtension(lowerPhotoFileName, ACCEPT_FILE_TYPES)) {
+						writer.print("error");
+					} else if (size >= 2 * 1024 * 1024) {
+						writer.print("overSize");
+					} else {
+						String newPath = PropertyManage.getInfoProperty("http.pic.url");// (linux)存放地址
+						String httpIp = PropertyManage.getInfoProperty("http.pic.ip");// IP地址
+						Integer type = 7;
+						String statu = HttpFileUpload.copy(adImage, newPath, type);
+						if ("0".equals(statu)) {
+							getResponse().getWriter().print("error");
+						} else {
+							retFtp.setDbFileUrl(statu);
+							retFtp.setDownFileUrl(httpIp + statu);
+							JsonWriter.write(retFtp);
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.info(e.getMessage(), e);
+		} finally {
+			if (fis1 != null) {
+				try {
+					fis1.close();
+				} catch (Exception e) {
+					logger.info(e.getMessage(), e);
+				}
+			}
+			if (fis2 != null) {
+				try {
+					fis2.close();
+				} catch (Exception e) {
+					logger.info(e.getMessage(), e);
+				}
+			}
+		}
+	}
+
+	/**
+	 * 关闭广告
+	 * 
+	 * @throws IOException
+	 * 
+	 */
+	@Action(value = "closeState", results = { @Result(type = "json") })
+	public void closeState() throws IOException {
+		String json = "success";
+		int flag = 0;
+		String adId = request.getParameter("adId");
+		AdvertManageVo adModel = new AdvertManageVo();
+		adModel.setAdStatus(4);
+		adModel.setAd_id(adId);
+		flag = adManageService.changeState(adModel);
+		if (flag == 0) {
+			json = "error";
+		}
+		// 添加日志
+		HttpSession httpSession = ServletActionContext.getRequest().getSession();
+		SysAdminVo admin = (SysAdminVo) httpSession.getAttribute("userInfo");
+		String userId = admin == null ? "" : admin.getUserId();
+		if (flag > 0) {
+			giftService.addSysLog(flag, userId, "广告关闭");
+		} else {
+			giftService.addSysLog(flag, userId, "广告关闭");
+		}
+		getResponse().getWriter().print(json);
+	}
+
+	/**
+	 * 开启广告
+	 * 
+	 * @throws IOException
+	 * 
+	 */
+	@Action(value = "openState", results = { @Result(type = "json") })
+	public void openState() throws IOException {
+		String json = "success";
+		int flag = 0;
+		String adId = request.getParameter("adId");
+		AdvertManageVo adModel = new AdvertManageVo();
+		adModel.setAdStatus(1);
+		adModel.setAd_id(adId);
+		flag = adManageService.changeState(adModel);
+		if (flag == 0) {
+			json = "error";
+		}
+		// 添加日志
+		HttpSession httpSession = ServletActionContext.getRequest().getSession();
+		SysAdminVo admin = (SysAdminVo) httpSession.getAttribute("userInfo");// 登录用帐号资料
+		String userId = admin == null ? "" : admin.getUserId();
+		if (flag > 0) {
+			giftService.addSysLog(flag, userId, "广告开启");
+		} else {
+			giftService.addSysLog(flag, userId, "广告开启");
+		}
+		getResponse().getWriter().print(json);
+	}
+
+	/**
+	 * 删除广告(改变状态 )
+	 * 
+	 * @throws IOException
+	 */
+	@Action(value = "deleteAdvert", results = { @Result(type = "json") })
+	public void deleteAdvert() throws IOException {
+		String json = "success";
+		int flag = 0;
+		String adId = request.getParameter("adId");
+		AdvertManageVo adModel = new AdvertManageVo();
+		adModel.setAdStatus(3);
+		adModel.setAd_id(adId);
+		flag = adManageService.changeState(adModel);
+		if (flag == 0) {
+			json = "error";
+		}
+		// 添加日志
+		HttpSession httpSession = ServletActionContext.getRequest().getSession();
+		SysAdminVo admin = (SysAdminVo) httpSession.getAttribute("userInfo");
+		String userId = admin == null ? "" : admin.getUserId();
+		if (flag > 0) {
+			giftService.addSysLog(flag, userId, "广告删除");
+		} else {
+			giftService.addSysLog(flag, userId, "广告删除");
+		}
+		getResponse().getWriter().print(json);
+	}
+	
+	
+	/**
+	 * 查询图片分辨率
+	 * @return
+	 */
+	@Action(value="clientType" ,results={@Result(type="json")})
+	public String clientType(){
+		String clientType = request.getParameter("clientType");
+		List<String> jsonList = new ArrayList<String>();
+		if("1".equals(clientType)){
+			for(String i : picResolution_sign){
+				jsonList.add(i);
+			}
+		}else if("2".equals(clientType)){
+			for(String i :iosPic_sign){
+				jsonList.add(i);
+			}
+		}
+		JsonWriter.write(jsonList);
+		return null;
+		
+	}
+
+	public int getCurrentPageIndex() {
+		return currentPageIndex;
+	}
+
+	public void setCurrentPageIndex(int currentPageIndex) {
+		this.currentPageIndex = currentPageIndex;
+	}
+
+	public int getPageSize() {
+		return pageSize;
+	}
+
+	public void setPageSize(int pageSize) {
+		this.pageSize = pageSize;
+	}
+
+	public AdvertManageVo getAdModel() {
+		return adModel;
+	}
+
+	public void setAdModel(AdvertManageVo adModel) {
+		this.adModel = adModel;
+	}
+
+	public File getAdImage() {
+		return adImage;
+	}
+
+	public void setAdImage(File adImage) {
+		this.adImage = adImage;
+	}
+
+	public List<AppVersionVo> getVsnList() {
+		return versionVoList;
+	}
+
+	public void setVsnList(List<AppVersionVo> vsnList) {
+		this.versionVoList = vsnList;
+	}
+
+	public String getAdImageFileName() {
+		return adImageFileName;
+	}
+
+	public void setAdImageFileName(String adImageFileName) {
+		this.adImageFileName = adImageFileName;
+	}
+
+	public String getAdImageContentType() {
+		return adImageContentType;
+	}
+
+	public void setAdImageContentType(String adImageContentType) {
+		this.adImageContentType = adImageContentType;
+	}
+
+	public List<AdvertImageVo> getImageList() {
+		return imageList;
+	}
+
+	public void setImageList(List<AdvertImageVo> imageList) {
+		this.imageList = imageList;
+	}
+
+	public List<String> getPicSign() {
+		return picSign;
+	}
+
+	public void setPicSign(List<String> picSign) {
+		this.picSign = picSign;
+	}
+
+}

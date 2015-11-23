@@ -1,0 +1,130 @@
+package com.pig84.ab.utils;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.TimeZone;
+
+import org.apache.commons.lang3.time.DateUtils;
+
+/**
+ * 获取时间类
+ * 
+ * @author zhangqiang
+ *
+ */
+public class MyDate {
+
+	private static final String DAYS[] = { "星期天", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六" };
+
+	private static final String DAYS_IN_SHORT[] = { "日", "一", "二", "三", "四", "五", "六" };
+
+	public static enum Format {
+
+		DATE("yyyy-MM-dd"),
+
+		DATETIME("yyyy-MM-dd HH:mm:ss"),
+
+		HOURMIN("HH:mm"),
+
+		DATEHOURMIN("yyyy-MM-dd HH:mm");
+
+		private final SimpleDateFormat format;
+
+		Format(String formatText) {
+			format = new SimpleDateFormat(formatText);
+		}
+
+		public Date parse(String s) {
+			try {
+				return format.parse(s);
+			} catch (ParseException e) {
+				return null;
+			}
+		}
+
+		public Date parse(String s, Date defaultDate) {
+			try {
+				return format.parse(s);
+			} catch (ParseException e) {
+				return defaultDate;
+			}
+		}
+
+		public String format(Date date) {
+			return format.format(date);
+		}
+
+		public String now() {
+			return format(new Date());
+		}
+
+	};
+
+	static {
+		System.setProperty("user.timezone", "Asia/Shanghai");
+		TimeZone tz = TimeZone.getTimeZone("Asia/Shanghai");
+		TimeZone.setDefault(tz);
+	}
+
+	public static String addTimeByMin(String time, int min) {
+		Date date = Format.DATETIME.parse(time);
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(date);
+		cal.add(Calendar.MINUTE, min);
+		return Format.DATETIME.format(cal.getTime());
+	}
+	
+	public static Date today() {
+		Calendar cal = Calendar.getInstance();
+		cal.set(Calendar.HOUR, 0);
+		cal.set(Calendar.MINUTE, 0);
+		cal.set(Calendar.SECOND, 0);
+		cal.set(Calendar.MILLISECOND, 0);
+		return cal.getTime();
+	}
+
+	public static int compare_date_time(String DATETIME1, String DATETIME2) {
+		Date dt1 = Format.DATETIME.parse(DATETIME1);
+		Date dt2 = Format.DATETIME.parse(DATETIME2);
+		return dt1.compareTo(dt2);
+	}
+
+	// OFFSET表示与当天相差的天数，取得与当前相隔多少天之前或之后的日期。因此offset也可以为负数
+	public static String getPriorDay1(int offset) {
+		return Format.DATEHOURMIN.format(DateUtils.addDays(new Date(), offset));
+	}
+
+	// 获取指定时间是否是当前的n个分钟之前的后面,如首次充值时间是否在当前时间的一个月前的前面。addMinute可以为负数
+	public static boolean isAfterNMinute(String datetime, int addMinute) {
+		Date forTime = Format.DATETIME.parse(datetime);
+		Calendar theday = Calendar.getInstance();
+		theday.add(Calendar.MINUTE, addMinute);
+		return forTime.after(theday.getTime());
+	}
+
+	public static String getweekofday(String djrq) {
+		Date date = Format.DATE.parse(djrq);
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(date);
+		int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
+		return DAYS[dayOfWeek - 1];
+	}
+
+	public static String getweekofdayByShot(String djrq) {
+		Calendar calendar = Calendar.getInstance();
+		Date date = Format.DATE.parse(djrq);
+		calendar.setTime(date);
+		int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
+		return DAYS_IN_SHORT[dayOfWeek - 1];
+	}
+
+	public static int diffMinutes(String beginTime, String endTime) {
+		Date one = Format.DATEHOURMIN.parse(beginTime);
+		Date two = Format.DATEHOURMIN.parse(endTime);
+		long diff = one.getTime() - two.getTime();
+		return (int) (diff / DateUtils.MILLIS_PER_MINUTE);
+	}
+
+}

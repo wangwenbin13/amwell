@@ -1,0 +1,154 @@
+package com.pig84.ab.service.impl;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.pig84.ab.dao.ILoginAndRegisterDao;
+import com.pig84.ab.dao.UserIdMapDao;
+import com.pig84.ab.service.ILoginAndRegisterService;
+import com.pig84.ab.vo.ErrLog;
+import com.pig84.ab.vo.PassengerInfo;
+import com.pig84.ab.vo.UserIdMap;
+import com.pig84.ab.vo.bean.AppVo_3;
+import com.pig84.ab.vo.bean.AppVo_4;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_8;
+
+/**
+ * 登录注册相关
+ * 
+ * @author zhangqiang
+ *
+ */
+@Service("loginAndRegisterService")
+public class LoginAndRegisterServiceImpl implements ILoginAndRegisterService {
+
+	@Autowired
+	private ILoginAndRegisterDao loginAndRegisterDao;
+
+	@Autowired
+	private UserIdMapDao userIdMapDao;
+	
+	/** 检查手机号码唯一 */
+	public String checkMobile(String mobile) {
+		return loginAndRegisterDao.checkMobile(mobile);
+	}
+
+	/** 注册 **/
+	public String register(PassengerInfo user) {
+		return loginAndRegisterDao.register(user);
+	}
+
+	/** 登录 **/
+	public PassengerInfo login(String telephone, String passWord, String terminal, String passWord_, String imei) {
+		return loginAndRegisterDao.login(telephone, passWord, terminal, passWord_, imei);
+	}
+
+	/** 修改用户信息 **/
+	public String updateUserInfo(String passengerId, String nickName, String headerPicUrl, String sex) {
+		return loginAndRegisterDao.updateUserInfo(passengerId, nickName, headerPicUrl, sex);
+	}
+
+	/** 反馈建议 **/
+	public String help(String context, String phoneNo, String userid) {
+		return loginAndRegisterDao.help(context, phoneNo, userid);
+	}
+
+	/**
+	 * 根据用户ID获取用户信息
+	 */
+	public PassengerInfo updateUserForSession(String userid) {
+		return loginAndRegisterDao.updateUserForSession(userid);
+	}
+
+	/** 根据微信openId获取用户信息 **/
+	public PassengerInfo getPassengerByOpenId(String uid, String type) {
+		return loginAndRegisterDao.getPassengerByOpenId(uid, type);
+	}
+
+	/** 消息列表 **/
+	public List<AppVo_8> msgList(String userid) {
+		return loginAndRegisterDao.msgList(userid);
+	}
+
+	/** 消息详情 **/
+	public AppVo_5 msgInfo(String msgid, String userid) {
+		return loginAndRegisterDao.msgInfo(msgid, userid);
+	}
+
+	/** 删除消息 **/
+	public String delMsg(String msgids, String userid) {
+		return loginAndRegisterDao.delMsg(msgids, userid);
+	}
+
+	/**
+	 * app添加错误日志
+	 */
+	public String addAppLog(ErrLog err) {
+		return loginAndRegisterDao.addAppLog(err);
+	}
+
+	/**
+	 * 获取app版本
+	 */
+	public AppVo_5 getVersion() {
+		return loginAndRegisterDao.getVersion();
+	}
+
+	/** 判断该用户是不是华为员工 **/
+	public boolean judgeUserType(String telephone) {
+		return loginAndRegisterDao.judgeUserType(telephone);
+	}
+
+	/** 判断是否送对应的补贴信息 **/
+	public AppVo_3 juderSendAllowance(String telephone, String orderNo) {
+		return loginAndRegisterDao.juderSendAllowance(telephone, orderNo);
+	}
+
+	/** 获取城市信息 **/
+	public AppVo_4 getSysArea(String cityName) {
+		return loginAndRegisterDao.getSysArea(cityName);
+	}
+
+	/** 获取IOS版本 **/
+	public AppVo_5 getIOSVersion(String appType) {
+		return loginAndRegisterDao.getIOSVersion(appType);
+	}
+
+	/** 根据用户ID修改openid **/
+	public String updateOpenId(String openid, String uid) {
+		return loginAndRegisterDao.updateOpenId(openid, uid);
+	}
+	
+	/**根据手机号码获取用户信息**/
+	public PassengerInfo getPassengerByTel(String tel){
+		return loginAndRegisterDao.getPassengerByTel(tel);
+	}
+
+	@Override
+	public void updateUserIdMap(UserIdMap userIdMap) {
+		userIdMapDao.add(userIdMap);
+	}
+
+	@Override
+	public UserIdMap getUserIdMap(String channelId, String clientId) {
+		if(StringUtils.isEmpty(channelId)||StringUtils.isEmpty(clientId)){
+			return null;
+		}
+		return userIdMapDao.getByClientIdAndChannelId(clientId, channelId);
+	}
+	
+	/**查询广告信息**/
+	public List<AppVo_5> getAdInfoList(String clientType,String imageResolution,String versionId){
+		return loginAndRegisterDao.getAdInfoList(clientType, imageResolution,versionId);
+	}
+	
+	/**根据手机号码更改sessionId**/
+	public String updateSessionIdByTel(String tel){
+		return loginAndRegisterDao.updateSessionIdByTel(tel);
+	}
+
+}

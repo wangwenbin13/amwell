@@ -1,0 +1,24 @@
+package com.pig84.ab.vo.coupon;
+
+import com.pig84.ab.vo.PassengerInfo;
+
+/**
+ * 城市规则
+ * @author gxt
+ *
+ */
+public class CityRule extends Rule {
+
+	public CityRule(String ruleName, String theCondition, String theValue) {
+		super(ruleName, theCondition, theValue);
+	}
+
+	@Override
+	public PassengerInfo filter(Object obj,PassengerInfo passenger) {
+		if ("equal".equals(getTheCondition()) && getTheValue().equals(passenger.getCityCode()) || 
+				"notEq".equals(getTheCondition()) && !getTheValue().equals(passenger.getCityCode())) {//规则中的城市与用户所属城市相匹配
+			return passenger;
+		}
+		return null;
+	}
+}

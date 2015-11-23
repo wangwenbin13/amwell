@@ -1,0 +1,617 @@
+package com.pig84.ab.action;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.pig84.ab.cache.UserCache;
+import com.pig84.ab.service.ILineService;
+import com.pig84.ab.service.ILoginAndRegisterService;
+import com.pig84.ab.service.ITaskForMsgService;
+import com.pig84.ab.vo.Coord;
+import com.pig84.ab.vo.LineBaseInfo;
+import com.pig84.ab.vo.LineSearchCondition;
+import com.pig84.ab.vo.ParamVo;
+import com.pig84.ab.vo.User;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_10;
+import com.pig84.ab.vo.bean.AppVo_14;
+import com.pig84.ab.vo.bean.AppVo_15;
+import com.pig84.ab.vo.bean.AppVo_2_list;
+import com.pig84.ab.vo.bean.AppVo_3_list;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_6;
+
+/**
+ * 线路相关
+ * @author zhangqiang
+ *
+ */
+@ParentPackage("no-interceptor")
+@Namespace("/app_lineInfo")
+@SuppressWarnings("all")
+@ExceptionMappings( { @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class LineInfoAction extends BaseAction {
+	
+	@Autowired
+	private ILineService lineService;
+	
+	@Autowired
+	private ITaskForMsgService task;
+	
+	@Autowired
+	private ILoginAndRegisterService loginAndRegisterService;
+	
+	
+	/**
+	 * 拆分线路列表
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "getSplitLine",results={@Result(type="json")})
+	public void getSplitLine() throws IOException{
+		ParamVo paramVo = new ParamVo();
+		String sName = request.getParameter("sName");//起点名称
+		String sLat = request.getParameter("sLat");//起点纬度
+		String sLon = request.getParameter("sLon");//起点经度
+		String eName = request.getParameter("eName");//终点名字
+		String eLat = request.getParameter("eLat");//终点纬度
+		String eLon = request.getParameter("eLon");//终点经度
+		String comeOrBack = request.getParameter("comeOrBack");//去程还是返程 : 1去程 2:返程
+		if(StringUtils.isEmpty(comeOrBack)){
+			comeOrBack = "1";
+		}
+		if("1".equals(comeOrBack)){
+			paramVo.setsLat(sLat);
+			paramVo.setsLon(sLon);
+			paramVo.seteLat(eLat);
+			paramVo.seteLon(eLon);
+			paramVo.seteName(eName);
+			paramVo.setsName(sName);
+		}else{
+			paramVo.setsName(eName);
+			paramVo.setsLat(eLat);
+			paramVo.setsLon(eLon);
+			paramVo.seteName(sName);
+			paramVo.seteLat(sLat);
+			paramVo.seteLon(sLon);
+		}
+		String cityName = request.getParameter("cityName");//城市
+		if(StringUtils.isEmpty(cityName)){
+			cityName = "深圳";
+		}
+		cityName = cityName.replace("市","");
+		paramVo.setCityName(cityName);
+		boolean flag = false;
+		User appUser = UserCache.getUser();//当前登录用户信息
+		if(null!=appUser && !StringUtils.isEmpty(appUser.getTelephone())){
+			//判断该用户是不是华为员工
+			flag = loginAndRegisterService.judgeUserType(appUser.getTelephone());
+		}
+		paramVo.setFlag(flag);
+		List<AppVo_14> list = lineService.getSplitLine(paramVo);
+		write(list);
+	}
+	
+	
+	/**
+	 * 附近站点搜索(需要分业页)
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getNearSplitLine",results={@Result(type="json")})
+	public void getNearSplitLine() throws IOException{
+		ParamVo paramVo = new ParamVo();
+		String name = request.getParameter("name");//站点名字
+		String lat = request.getParameter("lat");//起点纬度
+		String lon = request.getParameter("lon");//起点经度
+		paramVo.setsLat(lat);
+		paramVo.setsLon(lon);
+		paramVo.setsName(name);
+		String cityName = request.getParameter("cityName");//城市
+		if(StringUtils.isEmpty(cityName)){
+			cityName = "深圳";
+		}
+		paramVo.setCityName(cityName);
+		User appUser = UserCache.getUser();//当前登录用户信息
+		boolean flag = false;
+		if(null!=appUser && !StringUtils.isEmpty(appUser.getTelephone())){
+			//判断该用户是不是华为员工
+			flag = loginAndRegisterService.judgeUserType(appUser.getTelephone());
+		}
+		paramVo.setFlag(flag);
+		String currentPage = request.getParameter("currentPage");//当前页
+		if(StringUtils.isEmpty(currentPage)){
+			currentPage = "0";
+		}
+		paramVo.setCurrentPage(Integer.parseInt(currentPage));
+		String pageSize = request.getParameter("pageSize");//每页显示数据
+		if(StringUtils.isEmpty(pageSize)){
+			pageSize = "5";
+		}
+		paramVo.setPageSize(Integer.parseInt(pageSize));
+		List<AppVo_14> list = lineService.getNearSplitLine(paramVo);
+		write(list);
+	}
+	
+	/**
+	 * 获取线路列表
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "getLineList",results={@Result(type="json")})
+	public void getLineInfo() throws IOException{
+		List<LineBaseInfo> list = new ArrayList<LineBaseInfo>();
+		boolean flag = false;
+		//如果类型是上下班(lineType=1)
+		//则需要判断该用户是不是华为员工，如果是，可以看到所有的线路(包括华为线路)
+		//否则，看不到华为线路
+		User appUser = UserCache.getUser();//当前登录用户信息
+		String userId = "";//当前用户id
+		if(appUser!=null){
+			userId = appUser.getPassengerId();
+		}
+		LineSearchCondition searchCondition = new LineSearchCondition(request.getParameter("currentPage"), request.getParameter("pageSize"),
+				request.getParameter("lineType"), userId, request.getParameter("cityName"), request.getParameter("areaName"), request.getParameter("sStation"), 
+				request.getParameter("eStation"), request.getParameter("stationName"));
+		if("1".equals(searchCondition.getLineType()) && null!=appUser){
+			//判断该用户是不是华为员工
+			flag = loginAndRegisterService.judgeUserType(appUser.getTelephone());
+			if(flag){
+				//是华为员工
+				list = lineService.getLineInfoByPage(searchCondition);
+			}else{
+				//一般用户或没登陆用户
+				list = lineService.getLineInfoByPageNotIncludeHW(searchCondition);
+			}
+		}else{
+			//一般用户或没登陆用户
+			list = lineService.getLineInfoByPageNotIncludeHW(searchCondition);
+		}
+		//转换APP专用bean(AppVo)
+		List<AppVo_15> applist = transToLineVoList(list, flag , searchCondition);
+		write(applist);
+	}
+
+	/**
+	 * 转换APP专用bean(AppVo)
+	 * @param list
+	 * @param flag
+	 * @param searchCondition
+	 * @return
+	 */
+	private List<AppVo_15> transToLineVoList(List<LineBaseInfo> list, boolean flag, LineSearchCondition searchCondition) {
+		List<AppVo_15> applist = new ArrayList<AppVo_15>();
+		if(list!=null && list.size()!=0){
+			// 获取线路条数
+			int countLine =  lineService.queryLineCount(flag,searchCondition.getLineType(),searchCondition.getCityName(),searchCondition.getAreaName(),searchCondition.getStationName());
+			for (int i = 0; i < list.size(); i++) {
+				AppVo_15 vo = new AppVo_15();
+				vo.setA1(list.get(i).getLineBaseId()); 						//a1:线路ID
+				vo.setA2(list. get(i).getFromStation()); 					//a2:起点站
+				vo.setA3(list.get(i).getToStation()); 						//a3:终点站
+				vo.setA4(list.get(i).getOrderPrice()); 						//a4:价格
+				vo.setA5(String.valueOf(list.get(i).getLineTime()));		//a5:预计行程时间
+				vo.setA6(list.get(i).getStationNames());					//a6:途径站点
+				vo.setA7(list.get(i).getPassengers());						//a7:报名人数
+				vo.setA8(list.get(i).getDeadlineTime());					//a8:报名截至日期
+				vo.setA9(list.get(i).getpCount());							//a9:已报名人数
+				if("".equals(list.get(i).getIsSign())|| list.get(i).getIsSign() ==null){
+					vo.setA10("0");							//a10：是否报名
+				}else{
+					vo.setA10(list.get(i).getIsSign());							//a10：是否报名
+				}
+				if(list.get(i).getOriginalPrice()==null || "".equals(list.get(i).getOriginalPrice())){
+					vo.setA11("0.00");//原始价格
+				}else{
+					vo.setA11(list.get(i).getOriginalPrice());
+				}
+				vo.setA12(lineService.getStartTime(list.get(i).getLineBaseId()));//发车时间
+				if(50 - Integer.valueOf(list.get(i).getpCount())<=0){
+					vo.setA13("已报满");
+				}else if(50 - Integer.valueOf(list.get(i).getpCount())<=10){
+					vo.setA13("剩余"+String.valueOf(50 - Integer.valueOf(list.get(i).getpCount()))+"名额");
+				}else{
+					vo.setA13("有名额");
+				}
+				vo.setA14(String.valueOf(countLine));
+				applist.add(vo);
+			}
+		}
+		return applist;
+	}
+
+	/**
+	 * 获取城市列表
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "getCityList",results={@Result(type="json")})
+	public void getCityList() throws IOException{
+		String cityName = request.getParameter("cityName");
+		List<AppVo_1> list = lineService.getCityList(cityName);
+		write(list);
+	}
+	
+	/**
+	 * 常用路线
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "getBuyingLine",results={@Result(type="json")})
+	public void getBuyingLine() throws IOException{
+		User appUser = UserCache.getUser();//当前登录用户信息
+		List<AppVo_10> list = new ArrayList<AppVo_10>();
+		if (appUser!=null) {
+			list = lineService.getBuyingLine(appUser.getPassengerId());
+		}
+		write(list);
+	}
+	
+	
+	/**
+	 * 历史购票班车
+	 */
+	@Action(value = "queryHistoryLine",results={@Result(type="json")})
+	public void queryHistoryLine() throws IOException{
+		User appUser = UserCache.getUser();//当前登录用户信息
+		String cityName = request.getParameter("cityName");//城市名称
+		if(cityName==null || "".equals(cityName)){
+			cityName = "深圳市";
+		}
+		String areaName = request.getParameter("areaName");//线路区域
+		boolean flag = false;
+		List<AppVo_10> list = new ArrayList<AppVo_10>();
+		AppVo_2_list vo = new AppVo_2_list();
+		if (appUser!=null && !StringUtils.isEmpty(appUser.getPassengerId()) && !StringUtils.isEmpty(appUser.getTelephone())) {
+			/**判断是不是华为员工**/
+			flag = loginAndRegisterService.judgeUserType(appUser.getTelephone());
+			list = lineService.queryHistoryLine(appUser.getPassengerId(),cityName.replace("市", ""),areaName,flag);
+			vo.setA1("1");
+			vo.setList(list);
+		}else{
+			vo.setA1("0");
+		}
+		/**获取线路的条数**/
+		int countLine =  lineService.queryLineCount(flag,"1",cityName,areaName,null);
+		vo.setA2(String.valueOf(countLine));
+		write(vo);
+	}
+	
+	/**
+	 * 购票历史
+	 */
+	@Action(value = "getHistoryLine",results={@Result(type="json")})
+	public void getHistoryLine() throws IOException{
+		String imei = request.getParameter("imei");//设备号
+		String lat = request.getParameter("lat"); //纬度
+		String lon = request.getParameter("lon"); //经度
+		Coord coord = Coord.valueOf(lon, lat);
+		String cityName = request.getParameter("cityName");//城市名称
+		String passengerid = "";				  //当前登录用户ID
+		if(cityName==null || "".equals(cityName)){
+			cityName = "深圳市";
+		}
+		User appUser = UserCache.getUser();//当前登录用户信息
+		if(appUser!=null){
+			if (StringUtils.isNotBlank(appUser.getPassengerId())) {
+				passengerid = appUser.getPassengerId();
+			}
+		}
+		List<AppVo_15> list =  lineService.getHistoryLine(imei,coord,cityName,passengerid);
+		write(list);
+	}
+	
+	
+	/**
+	 * 商家介绍
+	 */
+	@Action(value = "geBusinessRemark",results={@Result(type="json")})
+	public void geBusinessRemark() throws IOException{
+		String businessId = request.getParameter("businessId");//商家ID
+		AppVo_1 vo = lineService.geBusinessRemark(businessId);
+		write(vo);
+	}
+	
+	/**
+	 * 申请添加班车
+	 */
+	@Action(value = "addApplyClass",results={@Result(type="json")})
+	public void addApplyClass() throws IOException{
+		User appUser = UserCache.getUser();//当前登录用户信息
+		AppVo_1 vo = new AppVo_1();
+		if(null==appUser || StringUtils.isEmpty(appUser.getPassengerId())){
+			vo.setA1("0");//没有登陆
+		}else{
+			String lineClassId = request.getParameter("lineClassId");
+			if(StringUtils.isEmpty(lineClassId)){
+				vo.setA1("2");//班次ID为空
+			}
+			int statu = lineService.addApplyClass(appUser.getPassengerId(),lineClassId);
+			if(1==statu){
+				vo.setA1("1");
+			}else if(3==statu){
+				vo.setA1("3");//已经申请过了
+			}
+		}
+		write(vo);
+	}
+	
+	/**
+	 * 根据线路获取站点信息
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "getStationsByLineId",results={@Result(type="json")})
+	public void getStationsByLineId() throws IOException{
+		String lineId = request.getParameter("lineId");
+		List<AppVo_5> list = lineService.getStationsByLineId(lineId);
+		write(list);
+	}
+	
+	
+	/**
+	 * 获取车辆当前所在的站点信息
+	 * @return
+	 * @throws IOException 
+	 */
+	@Action(value = "getBusPosition",results={@Result(type="json")})
+	public void getBusPosition() throws IOException{
+		String lineId = request.getParameter("lineId");
+		String stationId = request.getParameter("stationId");
+		AppVo_6 vo = lineService.getBusPosition(lineId,stationId);
+		write(vo);
+	}
+	
+	
+	/**
+	 * 用户发起线路
+	 * @return
+	 */
+	@Action(value = "addUserLine",results={@Result(type="json")})
+	public void addUserLine(){
+		String stime = request.getParameter("stime");//上班时间
+		String xtime = request.getParameter("xtime");//下班时间
+		String haddr = request.getParameter("haddr");//家地址
+		String caddr = request.getParameter("caddr");//公司地址
+		String hlat = request.getParameter("hlat");//家纬度
+		String hlon = request.getParameter("hlon");//家经度
+		Coord hco = Coord.valueOf(hlon, hlat);
+		String clat = request.getParameter("clat");//公司纬度
+		String clon = request.getParameter("clon");//公司经度
+		Coord cco = Coord.valueOf(clon, clat);
+		String km = request.getParameter("km"); //线路长度
+		String cityName = request.getParameter("cityName");//所属城市
+		String passengerid = "";
+		User appUser = UserCache.getUser();//当前登录用户信息
+		AppVo_1 vo = new AppVo_1();
+		if(appUser!=null){
+			passengerid = appUser.getPassengerId();
+			String result = lineService.addUserLine(passengerid,stime,xtime,haddr,caddr,hco,cco,km,cityName);
+			vo.setA1(result);//1：成功    2：当天超过2条   3：已经申请过
+		}else{
+			vo.setA1("0");
+		}
+		write(vo);
+	}
+	
+	/**
+	 * 招募报名
+	 * @return
+	 */
+	@Action(value = "enrollLine",results={@Result(type="json")})
+	public void enrollLine(){
+		String lineId = request.getParameter("lineId");//报名线路ID
+		String uid = request.getParameter("uid");//用户ID（微信用）
+		String passengerid = "";
+		User appUser = UserCache.getUser();//当前登录用户信息
+		AppVo_1 vo = new AppVo_1();
+		if(appUser!=null){
+			passengerid = appUser.getPassengerId();
+			String result = lineService.enrollLine(passengerid,lineId);
+			vo.setA1("1");
+		}else if(uid!=null){
+			passengerid = lineService.enrollLine(passengerid, lineId);
+			vo.setA1("1");
+		}else{
+			vo.setA1("0");
+		}
+		write(vo);
+	}
+	
+	/**
+	 * 招募线路详细
+	 * @return
+	 */
+	@Action(value = "enrollLineInfo",results={@Result(type="json")})
+	public void enrollLineInfo(){
+		String lineId = request.getParameter("lineId");//线路ID
+		String passengerid = "";
+		User appUser = UserCache.getUser();//当前登录用户信息
+		AppVo_15 vo = new AppVo_15();
+		if(appUser!=null){
+			passengerid = appUser.getPassengerId();
+		}
+		vo = lineService.enrollLineInfo(passengerid,lineId);
+		write(vo);
+	}
+
+	/**
+	 * 我的招募线路
+	 * @return
+	 */
+	@Action(value = "enrollLineList",results={@Result(type="json")})
+	public void enrollLineList(){
+		String type = request.getParameter("type");//0：我发起的线路  1：我报名的线路
+		String pageSize_ = request.getParameter("pageSize");//每页显示条数
+		String currentPage_ = request.getParameter("currentPage");//当前页数
+		String passengerid = "";
+		User appUser = UserCache.getUser();//当前登录用户信息
+		AppVo_2_list list = new AppVo_2_list();
+		if(appUser!=null){
+			int currentPage = 0;
+			int pageSize = 5;
+			if(currentPage_!=null && !currentPage_.equals("")){currentPage = Integer.valueOf(currentPage_);}
+			if(pageSize_!=null && !pageSize_.equals("")){pageSize = Integer.valueOf(pageSize_);}
+			List<AppVo_15> result = lineService.enrollLineList(appUser.getPassengerId(),type,String.valueOf(currentPage), String.valueOf(pageSize));
+			list.setA1("1");
+			list.setList(result);
+		}else{
+			list.setA1("0");
+		}
+		write(list);
+	}
+	
+	/**
+	 * 加上招募线路的线路搜索
+	 * @return
+	 */
+	@Action(value = "queryLineAndUserAppList",results={@Result(type="json")})
+	public String queryLineAndUserAppList(){
+		String startName = request.getParameter("sName");
+		String startLon = request.getParameter("sLon");
+		String startLat = request.getParameter("sLat");
+		String endName = request.getParameter("eName");
+		String endLon = request.getParameter("eLon");
+		String endLat = request.getParameter("eLat");
+		ParamVo paramVo = new ParamVo();
+		User appUser = UserCache.getUser();//当前登录用户信息
+		boolean flag = false;
+		if(null!=appUser && !StringUtils.isEmpty(appUser.getTelephone())){
+			//判断该用户是不是华为员工
+			flag = loginAndRegisterService.judgeUserType(appUser.getTelephone());
+			paramVo.setPassengerId(appUser.getPassengerId());
+		}
+		paramVo.setFlag(flag);
+		String comeOrBack = request.getParameter("comeOrBack");//去程还是返程 : 1去程 2:返程
+		if(StringUtils.isEmpty(comeOrBack)){
+			comeOrBack = "1";
+		}
+		if("1".equals(comeOrBack)){
+			paramVo.setsLat(startLat);
+			paramVo.setsLon(startLon);
+			paramVo.setsName(startName);
+			paramVo.seteLat(endLat);
+			paramVo.seteLon(endLon);
+			paramVo.seteName(endName);
+		}else{
+			paramVo.setsLat(endLat);
+			paramVo.setsLon(endLon);
+			paramVo.setsName(endName);
+			paramVo.seteLat(startLat);
+			paramVo.seteLon(startLon);
+			paramVo.seteName(startName);
+		}
+		String cityName = request.getParameter("cityName");//城市
+		if(StringUtils.isEmpty(cityName)){
+			cityName = "深圳";
+		}
+		cityName = cityName.replace("市","");
+		paramVo.setCityName(cityName);
+		List<AppVo_14> list = lineService.getSplitLineAndUserApp(paramVo);
+		write(list);
+		return null;
+	}
+	
+	/**
+	 * 加上招募线路的线路搜索(分页)--v2.3
+	 * @return
+	 */
+	@Action(value = "queryLineAndUserAppListByPage",results={@Result(type="json")})
+	public String queryLineAndUserAppListByPage(){
+		String type= request.getParameter("type");//1:发布线路 2:招募线路
+		String startName = request.getParameter("sName");
+		String startLon = request.getParameter("sLon");
+		String startLat = request.getParameter("sLat");
+		String endName = request.getParameter("eName");
+		String endLon = request.getParameter("eLon");
+		String endLat = request.getParameter("eLat");
+		ParamVo paramVo = new ParamVo();
+		User appUser = UserCache.getUser();//当前登录用户信息
+		boolean flag = false;
+		if(null!=appUser && !StringUtils.isEmpty(appUser.getTelephone())){
+			//判断该用户是不是华为员工
+			flag = loginAndRegisterService.judgeUserType(appUser.getTelephone());
+			paramVo.setPassengerId(appUser.getPassengerId());
+		}
+		paramVo.setFlag(flag);
+		String comeOrBack = request.getParameter("comeOrBack");//去程还是返程 : 1去程 2:返程
+		if(StringUtils.isEmpty(comeOrBack)){
+			comeOrBack = "1";
+		}
+		if("1".equals(comeOrBack)){
+			paramVo.setsLat(startLat);
+			paramVo.setsLon(startLon);
+			paramVo.setsName(startName);
+			paramVo.seteLat(endLat);
+			paramVo.seteLon(endLon);
+			paramVo.seteName(endName);
+		}else{
+			paramVo.setsLat(endLat);
+			paramVo.setsLon(endLon);
+			paramVo.setsName(endName);
+			paramVo.seteLat(startLat);
+			paramVo.seteLon(startLon);
+			paramVo.seteName(startName);
+		}
+		String currentPage = request.getParameter("currentPage");//当前页
+		if(StringUtils.isEmpty(currentPage)){
+			currentPage = "0";
+		}
+		paramVo.setCurrentPage(Integer.parseInt(currentPage));
+		String pageSize = request.getParameter("pageSize");//每页显示数据
+		if(StringUtils.isEmpty(pageSize)){
+			pageSize = "10";
+		}
+		paramVo.setPageSize(Integer.parseInt(pageSize));
+		String cityName = request.getParameter("cityName");//城市
+		if(StringUtils.isEmpty(cityName)){
+			cityName = "深圳";
+		}
+		cityName = cityName.replace("市","");
+		paramVo.setCityName(cityName);
+		String stationName = request.getParameter("stationName");//站点名称
+		if(!StringUtils.isEmpty(stationName)){
+			paramVo.setStationName(stationName);
+		}
+		AppVo_3_list vo = new AppVo_3_list();
+		List<AppVo_14> list = new ArrayList<AppVo_14>();
+		if(StringUtils.isEmpty(type)){
+			type="1";
+		}
+		
+		paramVo.setType(type);
+		String num = "1";//是否继续请求数据的标识 ---0：不请求  1：请求
+		if("1".equals(type)){
+			//发布线路
+			list = lineService.getSplitLineAndUserAppByPage(paramVo);
+		}
+		if(list.size()<Integer.parseInt(pageSize) || "2".equals(type)){
+			if("2".equals(type)){
+				list = lineService.getSplitLineAndUserAppByPage(paramVo);
+				if(list.size()<Integer.parseInt(pageSize)){
+					num = "0";
+				}
+			}else{
+				//第一次请求进入招募线路
+				currentPage = "0";
+			}
+			type="2";//标识为下次请求查找招募线路
+		}
+		vo.setA1(type);
+		vo.setA2(currentPage);
+		vo.setA3(num);
+		vo.setList(list);
+		write(vo);
+		return null;
+	}
+}

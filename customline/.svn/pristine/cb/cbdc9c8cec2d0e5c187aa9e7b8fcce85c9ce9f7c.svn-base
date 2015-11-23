@@ -1,0 +1,195 @@
+package com.amwell.dao.impl;
+
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.dbutils.QueryRunner;
+import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
+
+import com.amwell.base.DaoSupport;
+import com.amwell.commons.MyDataSource;
+import com.amwell.commons.MyDate;
+import com.amwell.dao.IAdmanageDao;
+import com.amwell.entity.Page;
+import com.amwell.entity.Search;
+import com.amwell.vo.AdvertImageVo;
+import com.amwell.vo.AdvertManageVo;
+import com.amwell.vo.AppVersionVo;
+import com.amwell.vo.IosVersionVo;
+
+@Repository(value = "admanageDaoImpl")
+public class AdmanageDaoImpl extends DaoSupport implements IAdmanageDao {
+
+	public Map<String, Object> getAdManage(Search search,int currentPageIndex, int pageSize) {
+		Map<String,Object> res = new HashMap<String,Object>();
+		super.finit("ad_config a left join sys_admin b on a.operateBy=b.userId");
+		StringBuffer sql = new StringBuffer("select a.*,b.userName from ad_config a left join sys_admin b on a.operateBy=b.userId where 1=1 and a.adStatus!=3");
+		//设置查询条件
+		List<Object> paramList = new ArrayList<Object>();
+		if(null!=search){
+			
+		}
+		//设置排序
+		sql.append(" order by a.operateOn desc");
+		Object[] params = paramList.toArray();
+		List<AdvertManageVo> adList = super.tableDao.queryByPage(AdvertManageVo.class, sql.toString(), currentPageIndex, pageSize, params);
+		Page page = new Page(adList,sql.toString(),currentPageIndex,pageSize,params);
+		res.put("page", page);
+		res.put("list",adList);
+		return res; 
+	}
+
+	/*
+	 * 查询广告详情
+	 */
+	public Map<String,Object> getAdManageDetail(String adId) {
+		super.finit("ad_config,ad_config_image");
+		Map<String, Object> res = new HashMap<String, Object>();
+		String adSql = "SELECT a.* FROM ad_config a WHERE a.ad_id = ?";
+		Object[] param = new Object[] { adId };
+		AdvertManageVo adModel = super.tableDao.queryBean(AdvertManageVo.class,adSql, param);
+		String picSql = "SELECT * FROM ad_config_image  WHERE adConfigId = ? ";
+		List<AdvertImageVo> picList = super.tableDao.queryList(AdvertImageVo.class, picSql, param);
+		res.put("adModel", adModel);
+		res.put("picList", picList);
+		return res;
+	}
+
+	/*
+	 * 添加广告信息
+	 */
+	public int addAdManage(AdvertManageVo adModel, List<AdvertImageVo> picLists) {
+		int flag = 0;
+		Connection conn = MyDataSource.getConnect();
+		if (conn == null) {
+			throw new IllegalStateException("Connection is null!");
+		}
+		if (adModel == null) {
+			throw new IllegalArgumentException("adModel is null");
+		}
+		if(CollectionUtils.isEmpty(picLists)){
+			throw new IllegalArgumentException("picLists is null");
+		}
+		adModel.setAdStatus(0);
+		try {
+			conn.setAutoCommit(false);
+			QueryRunner qr = new QueryRunner();
+			String sql = "INSERT INTO ad_config (ad_id,clientType,versionNO,effectiveTime,expirationTime,urlLink,operateBy,operateOn,adStatus,thumbnail,adTitle,urlSign) VALUE (?,?,?,?,?,?,?,?,?,?,?,?)";
+			flag = qr.update(conn,sql,new Object[] { adModel.getAd_id(), adModel.getClientType(),adModel.getVersionNO(), adModel.getEffectiveTime(),adModel.getExpirationTime(), adModel.getUrlLink(),adModel.getOperateBy(), 
+					MyDate.getMyDateLong(),adModel.getAdStatus(),adModel.getThumbnail(),adModel.getAdTitle(),adModel.getUrlSign() });
+		    if(flag>0){
+		    	for (AdvertImageVo picModel : picLists) {
+					String picSql = "INSERT INTO  ad_config_image (image_id,imageUrl,imageResolution,adConfigId) VALUE (?,?,?,?)";
+					qr.update(conn,picSql,new Object[] { picModel.getImage_id(), picModel.getImageUrl(),picModel.getImageResolution(), picModel.getAdConfigId() });
+				}
+		    }
+			conn.commit();
+		} catch (Exception e) {
+			flag = -9999;
+			e.printStackTrace();
+			if (conn != null) {
+				try {
+					conn.rollback();
+				} catch (Exception e2) {
+				}
+			}
+		} finally {
+			try {
+				conn.close();
+			} catch (Exception e2) {
+			}
+		}
+
+		return flag;
+	}
+
+	/*
+	 * 查询android版本
+	 */
+	public List<AppVersionVo> getVersion() {
+		super.finit("app_version");
+		String sql = "SELECT vsn FROM app_version where type=0 and appType=1 and state=0 and flag>9 order by vsn";
+		List<AppVersionVo> vsnList = super.tableDao.queryList(AppVersionVo.class, sql);
+		return vsnList;
+	}
+
+	/*
+	 * 改变广告状态
+	 */
+	public int changeState(AdvertManageVo adModel) {
+		super.finit("ad_config");
+		String sql = "select clientType from ad_config where ad_id like ? ";
+		String id=adModel.getAd_id();
+		AdvertManageVo clientTypeModel = super.tableDao.queryBean(AdvertManageVo.class, sql, new Object[]{id});
+		adModel.setClientType(clientTypeModel.getClientType());
+		int flag = 0;
+		flag = super.tableDao.updateData(adModel, "ad_id");
+		return flag;
+	}
+
+	/* 
+	 * 编辑广告
+	 */
+	public int updateAdManage(AdvertManageVo adModel,List<AdvertImageVo> picLists) {
+		int flag = 0;
+		Connection conn = MyDataSource.getConnect();
+		if (conn == null) {
+			throw new IllegalStateException("Connection is null!");
+		}
+		if (adModel == null) {
+			throw new IllegalArgumentException("adModel is null");
+		}
+		if(CollectionUtils.isEmpty(picLists)){
+			throw new IllegalArgumentException("picLists is null");
+		}
+		try {
+			conn.setAutoCommit(false);
+			QueryRunner qr = new QueryRunner();
+			String sql = "update ad_config set clientType=?,versionNO=?,effectiveTime=?,expirationTime=?,urlLink=?,operateBy=?,operateOn=?,thumbnail=?,adStatus=?,adTitle=?,urlSign=? where ad_id=?";
+			flag = qr.update(conn,sql,new Object[] { adModel.getClientType(),adModel.getVersionNO(), adModel.getEffectiveTime(),adModel.getExpirationTime(), adModel.getUrlLink(),
+					adModel.getOperateBy(), MyDate.getMyDateLong(),adModel.getThumbnail(),adModel.getAdStatus(),adModel.getAdTitle(),adModel.getUrlSign(),adModel.getAd_id()});
+		    if(flag>0){
+		    	//删除原始图片
+		    	String delImageSql = "delete from ad_config_image where adConfigId = ?";
+		    	qr.update(conn,delImageSql,new Object[]{adModel.getAd_id()});
+		    	for (AdvertImageVo picModel : picLists) {
+					String picSql = "INSERT INTO  ad_config_image (image_id,imageUrl,imageResolution,adConfigId) VALUE (?,?,?,?)";
+					qr.update(conn,picSql,new Object[] { picModel.getImage_id(), picModel.getImageUrl(),picModel.getImageResolution(), picModel.getAdConfigId() });
+				}
+		    }
+			conn.commit();
+		} catch (Exception e) {
+			flag = -9999;
+			e.printStackTrace();
+			if (conn != null) {
+				try {
+					conn.rollback();
+				} catch (Exception e2) {
+				}
+			}
+		} finally {
+			try {
+				conn.close();
+			} catch (Exception e2) {
+			}
+		}
+
+		return flag;
+	}
+
+	/**
+	 * 查询ioS版本信息
+	 * @return
+	 */
+	public List<IosVersionVo> getIosVersion() {
+		super.finit("ios_version");
+		String sql = "SELECT version FROM ios_version where 1=1 and appType=1 and state=0 and flag>9 order by version";
+		List<IosVersionVo> vsnList = super.tableDao.queryList(IosVersionVo.class, sql);
+		return vsnList;
+	}
+
+}

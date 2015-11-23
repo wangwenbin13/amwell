@@ -1,0 +1,163 @@
+package com.pig84.ab.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import com.pig84.ab.vo.Coord;
+import com.pig84.ab.vo.LineBaseInfo;
+import com.pig84.ab.vo.LineSearchCondition;
+import com.pig84.ab.vo.LineSplitInfo;
+import com.pig84.ab.vo.LineUnion;
+import com.pig84.ab.vo.LineUserApplication;
+import com.pig84.ab.vo.ParamVo;
+import com.pig84.ab.vo.PassengerSearchLine;
+import com.pig84.ab.vo.Rect;
+import com.pig84.ab.vo.StationInfo;
+import com.pig84.ab.vo.StationUnion;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_10;
+import com.pig84.ab.vo.bean.AppVo_15;
+import com.pig84.ab.vo.bean.AppVo_15_list;
+import com.pig84.ab.vo.bean.AppVo_1_list;
+import com.pig84.ab.vo.bean.AppVo_2;
+import com.pig84.ab.vo.bean.AppVo_3;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_6;
+
+/**
+ * 线路相关接口
+ * 
+ * @author zhangqiang
+ *
+ */
+public interface ILineDao {
+
+	/** 获取线路列表 **/
+	public List<LineBaseInfo> getLineInfoByPage(LineSearchCondition lineSearchCondition);
+
+	/** 先找出报名该线路的所有乘客 **/
+	public List<AppVo_2> getAllAppliTelephoneByLineId(String lineId);
+
+	/** 找出线路发起人的信息 **/
+	public AppVo_2 getApplicationPassenger(String id);
+
+	/** 获取招募线路信息 **/
+	public LineUserApplication getLineUserApplication(String applicationId);
+
+	/** 获取城市列表 **/
+	public List<AppVo_1> getCityList(String cityName);
+
+	/** 一般用户或没登陆用户 **/
+	public List<LineBaseInfo> getLineInfoByPageNotIncludeHW(LineSearchCondition searchCondition);
+
+	/** 获取常用线路 **/
+	public List<AppVo_10> getBuyingLine(String passengerid);
+
+	/** 获取发车时间 **/
+	public String getStartTime(String linebaseid);
+
+	/** 历史购票班车 **/
+	public List<AppVo_10> queryHistoryLine(String passengerId, String cityName, String areaName, boolean flag);
+
+	/** 获取线路的条数 **/
+	public int queryLineCount(boolean flag, String lineType, String cityName, String areaName, String stationName);
+
+	/**
+	 * 将line_user_application表中的数据 和line_user_application_station表中的数据转换
+	 **/
+	public int conversionValue();
+
+	/** 更新招募相关信息 **/
+	public void updateSomeTable();
+
+	/** 查询是否执行过conversion方法 **/
+	public int queryConversionTimes();
+
+	/** 购票历史 **/
+	public List<AppVo_15> getHistoryLine(String imei, Coord coord, String cityName, String passengerid);
+
+	/** 根据起点和终点查询线路拆分表line_split_info的主键ID：sid不重复 **/
+	public List<LineSplitInfo> querySplieSid(List<StationInfo> sList, List<StationInfo> eList, boolean flag);
+
+	/** 根据起点信息和条件获得线路拆分表line_split_info的主键ID：sid不重复 **/
+	public List<LineSplitInfo> querySplieSid(List<StationInfo> sList, int i, boolean flag);
+
+	/** 根据站点线路ID获取对应的线路信息 **/
+	public List<LineBaseInfo> queryLineBaseInfoById(String lineBaseIds, String cityName);
+
+	/** 找出存在这些站点的线路 **/
+	public List<LineSplitInfo> getNearSplitLine(List<StationInfo> poiStar, List<AppVo_3> vo3s, ParamVo paramVo);
+
+	/** 根据线路ID获取线路班次信息 **/
+	public AppVo_15_list queryLineBaseAndClass(String lineBaseId);
+
+	/** 商家介绍 **/
+	public AppVo_1 geBusinessRemark(String businessId);
+
+	/** 申请添加班车 **/
+	public int addApplyClass(String passengerId, String lineClassId);
+
+	/** 根据线路ID获取站点信息 **/
+	public List<AppVo_5> getStationsByLineId(String lineId);
+
+	/** 获取车辆当前站点信息 **/
+	public AppVo_6 getBusPosition(String lineId, String stationId);
+
+	/** 添加乘客线路搜索记录 **/
+	public int addPassengerSearchLine(PassengerSearchLine pa);
+
+	/** 先判断数据是否存在--存在了则不添加 **/
+	public int isexist(ParamVo paramVo);
+
+	/** 用户发起线路 **/
+	public String addUserLine(String passengerid, String stime, String xtime, String haddr, String caddr, Coord hco, Coord cco, String km, String cityName);
+
+	/** 招募报名 **/
+	public String enrollLine(String passengerid, String lineId);
+
+	/** 招募线路详细 **/
+	public AppVo_15 enrollLineInfo(String passengerid, String lineId);
+
+	/** 我的招募线路 **/
+	public List<AppVo_15> enrollLineList(String passengerid, String type, String currentPage, String pageSize);
+
+	/** 根据起点信息和条件--两表联合查询 **/
+	public List<LineUnion> queryUnionSplieAndUserApp(List<StationUnion> sList, int i, boolean flag);
+
+	/** 根据起点和终点查询线路--两表联合查询 **/
+	public List<LineUnion> queryUnionSplieAndUserApp(List<StationUnion> sList, List<StationUnion> eList, boolean flag);
+
+	/** 根据招募站点ID获取站点信息 **/
+	public List<StationUnion> queryZhaoMuStationById(String zhaomuList);
+
+	/** 查看用户是否有登录,如果有的话,查看是否对招募线路进行了报名 **/
+	public List<LineUnion> queryUserApplyLine(String passengerId);
+
+	/** 分页查询联合表 **/
+	public List<LineUnion> queryUnionSplieAndUserAppPage(List<StationUnion> sList, ParamVo paramVo);
+
+	/**
+	 * 根据起点信息条件--查询
+	 * @param stat 站点
+	 * @param i  1：(起点有信息) 2:(终点有信息)
+	 * @param flag true:(华为员工)  false:(不是华为员工)
+	 * @param j 1:(发布线路)  2：(招募线路)
+	 * @param currentPage 当前页
+	 * @param pageSize 每页显示的记录数
+	 * @return
+	 */
+	public List<LineUnion> queryUnionSplieAndUserAppByPage(List<StationUnion> stat, int i, boolean flag, int j,int currentPage,int pageSize);
+
+	/**
+	 * 根据站点点信息条件--查询(起点终点都有)
+	 * @param poiStar 起点
+	 * @param poiEnd  终点
+	 * @param flag true:(华为员工)  false:(不是华为员工)
+	 * @param j 1:(发布线路)  2：(招募线路)
+	 * @param currentPage 当前页
+	 * @param pageSize 每页显示的记录数
+	 * @return
+	 */
+	public List<LineUnion> queryUnionSplieAndUserAppByPage(List<StationUnion> poiStar, List<StationUnion> poiEnd,
+			boolean flag, int j, Integer currentPage, Integer pageSize);
+}

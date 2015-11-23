@@ -1,0 +1,458 @@
+package com.amwell.action.user;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.ServletActionContext;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.amwell.action.BaseAction;
+import com.amwell.commons.JsonWriter;
+import com.amwell.commons.PropertyManage;
+import com.amwell.entity.Page;
+import com.amwell.entity.Search;
+import com.amwell.service.IChangeTicketService;
+import com.amwell.service.ILeaseOrderService;
+import com.amwell.service.IPassengerInfoService;
+import com.amwell.service.ISysAreaService;
+import com.amwell.vo.PassengerInfoEntity;
+import com.amwell.vo.SysAdminVo;
+import com.amwell.vo.SysArea;
+
+/**
+ * 运营平台-用户管理-乘客管理
+ * @author 龚雪婷
+ *
+ */
+@ParentPackage("user-finit")
+@Namespace("/operationPassenger")
+//@SuppressWarnings("serial")
+@SuppressWarnings("all")
+@ExceptionMappings( { @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class PassengerAction extends BaseAction {
+	//乘客service
+	@Autowired
+	private IPassengerInfoService service;
+	
+	@Autowired
+	private ILeaseOrderService iLeaseOrderService;
+	
+	@Autowired
+	private IChangeTicketService changeTicketService;
+	
+	/**
+	* 区域
+	*/
+	@Autowired
+	private ISysAreaService iSysAreaService;
+	
+	//乘客对象
+	private PassengerInfoEntity passengerInfoEntity;
+	
+	/**
+	 * 记录数的下标记数，0开始，到10
+	 */
+	private Integer currentPageIndex = 0;
+	
+	/**
+	 * 每页显示记录数
+	 */
+	private Integer pageSize = 5;
+	
+	private Integer regsit=0;
+	
+	/**
+	 * 区域省份集合
+	 */
+	private List<SysArea> proSysAreas;
+	
+	/**
+	 * 乘客管理
+	 */
+	@Action(value="customManager",results={@Result(name="success",location="../../view/user/customManager.jsp")})
+	public String customManager()throws Exception{
+		// 从已发布列表进入详情时传过来的标识，用于已发布列表详情页面点击上一页按钮时判断显示哪一个列表tab
+		Object theTab = super.session.get("theTab");
+		if (theTab instanceof String) {
+			super.request.setAttribute("theTab", theTab);
+			super.session.remove("theTab");
+		}
+		return SUCCESS;
+	}
+	
+	private void getConditionInfo(){
+		if(request.getParameter("p")==null&&session.get("toDetailCurrentPageIndex")==null){//第一次访问该列表时清空session中的查询条件信息
+			session.remove("passengerList_Cond");
+		}
+		/*将条件存到session,便于刷新后任然存在页面而不会丢失*/
+		search = (Search) (search == null?session.get("passengerList_Cond"):search);
+		if(null==search){
+			search=new Search();
+		}
+	}
+	private void getListInfo(String sourcefrom){
+		try {
+			session.put("passengerList_Cond", search);
+			/*当前页*/
+			Object cpi = super.session.get("toDetailCurrentPageIndex");
+			if (null != cpi) {
+				if (cpi instanceof Integer) {
+					this.currentPageIndex = (Integer) cpi;
+					super.session.remove("toDetailCurrentPageIndex");
+				}
+			} else {
+				String currentPage = request.getParameter("currentPageIndex");
+				if(currentPage == null){
+					currentPageIndex=0; 
+				}else{ 
+					currentPageIndex=Integer.parseInt(currentPage);
+				}
+			}
+			/*每页显示条数*/
+			pageSize = 10;
+			//集合对象
+			map = service.listByPage(search,currentPageIndex,pageSize,sourcefrom);
+			list = (List) map.get("list");//数据对象
+			if(null!=list){
+				for (Object o : list) {
+					PassengerInfoEntity passengerInfo=(PassengerInfoEntity) o;
+					passengerInfo.setHeaderPicUrl(PropertyManage.getInfoProperty("http.pic.ip"));
+				}
+			}
+			page = (Page) map.get("page");//分页对象
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * 加载所有乘客列表
+	 */
+	@Action(value = "passengerList", results = { @Result(name = "success", location = "../../view/user/passengerList.jsp") })
+	public String list(){
+		getConditionInfo();
+		if(null == search.getField10() || "".equals(search.getField10())){
+			search.setField09("-1");//所有乘客
+		}
+		request.setAttribute("passengerType","-1");
+		regsit=1;
+		request.setAttribute("regsit", regsit);
+		getListInfo("1");//小猪巴士用户
+		return SUCCESS;
+	}
+	
+	/**
+	 * 加载app注册乘客列表
+	 */
+	@Action(value = "appPassengerList", results = { @Result(name = "success", location = "../../view/user/passengerList.jsp") })
+	public String list1(){
+		getConditionInfo();
+		search.setField10("1");//app注册乘客
+		request.setAttribute("passengerType","1");
+		getListInfo("1");//小猪巴士用户
+		return SUCCESS;
+	}
+	
+	/**
+	 * 加载微信注册乘客列表
+	 */
+	@Action(value = "weiXinPassengerList", results = { @Result(name = "success", location = "../../view/user/passengerList.jsp") })
+	public String list2(){
+		getConditionInfo();
+		search.setField10("3");//微信注册乘客
+		request.setAttribute("passengerType","3");
+		getListInfo("1");//小猪巴士用户
+		return SUCCESS;
+	}
+	
+	/**
+	 * 加载第三方乘客列表
+	 */
+	@Action(value = "disanfangPassengerList", results = { @Result(name = "success", location = "../../view/user/passengerList.jsp") })
+	public String list3(){
+		getConditionInfo();
+		request.setAttribute("passengerType","4");//第三方乘客
+		getListInfo("2");//第三方用户
+		return SUCCESS;
+	}
+	
+	/**
+	 * 查看乘客详情总页面
+	 * @return
+	 */
+	@Action(value = "passengerDetail", results = { @Result(name = "success", location = "../../view/user/passengerDetail.jsp") })
+	public String detailManager(){
+		super.getSession().put("toDetailCurrentPageIndex",this.currentPageIndex);
+		// 从已发布列表进入详情时传过来的标识，用于已发布列表详情页面点击上一页按钮时判断显示哪一个列表tab
+		String theTab = super.request.getParameter("theTab");
+		if (StringUtils.isNotBlank(theTab)) {
+			super.getSession().put("theTab", theTab);
+		}
+		return SUCCESS;
+	}
+	
+	/**
+	 * 手动添加用户弹窗
+	 * @return
+	 */
+	@Action(value = "popPassenger", results = { @Result(name = "success", location = "../../view/user/pop-passenger.jsp") })
+	public String popPassenger(){
+		//加载省数据
+		SysArea sysArea = new SysArea();
+		sysArea.setFdCode("-1");
+		proSysAreas = iSysAreaService.querySysArea(sysArea);
+		return SUCCESS;
+	}
+	
+	/**
+	 * 批量注册用户
+	 * @return
+	 */
+	@Action(value = "popPassengerRegsit", results = { @Result(name = "success", location = "../../view/user/pop-passengerRegsit.jsp") })
+	public String popPassengerRegsit(){
+		//加载省数据
+		SysArea sysArea = new SysArea();
+		sysArea.setFdCode("-1");
+		proSysAreas = iSysAreaService.querySysArea(sysArea);
+		return SUCCESS;
+	}
+	
+	
+	/**
+	 * 查看乘客详情
+	 * @return
+	 */
+	@Action(value = "passengerDetailPage", results = { @Result(name = "success", location = "../../view/user/passengerDetailPage.jsp") })
+	public String detail(){
+		try {
+			String passengerId=request.getParameter("passengerId");
+			passengerInfoEntity=service.getPassengerById(passengerId);
+			if(null!=passengerInfoEntity){
+//				if(StringUtils.isBlank(passengerInfoEntity.getHeaderPicUrl())||"#".equals(passengerInfoEntity.getHeaderPicUrl())){
+//					passengerInfoEntity.setHeaderPicUrl(null);
+//				}
+//				else{
+					passengerInfoEntity.setHeaderPicUrl(PropertyManage.getInfoProperty("http.pic.ip")+"/"+passengerInfoEntity.getHeaderPicUrl());
+//				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return SUCCESS;
+	}
+	/**
+	 * 查看订票信息
+	 * @return
+	 */
+	@Action(value = "passengerTicketList", results = { @Result(name = "success", location = "../../view/user/passengerTicketList.jsp") })
+	public String getPassengerTicketList(){
+		try {
+			String passengerId=request.getParameter("passengerId");
+			currentPageIndex = request.getParameter("currentPageIndex")==null?0:Integer.parseInt(request.getParameter("currentPageIndex"));
+			/*每页显示条数*/
+			pageSize = 10;
+			if(null==search){
+				search=new Search();
+			}
+			search.setField03(passengerId);//乘客id
+			map = service.passengerOrderList(search,currentPageIndex,pageSize);
+			list = (List) map.get("list");//数据对象
+			page = (Page) map.get("page");//分页对象
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return SUCCESS;
+	}
+	/**
+	 * 查看订票信息 - 查看日期
+	 * @return
+	 */
+	@Action(value = "showDateDetail", results = { @Result(name = "success", location = "../../view/user/pop-dateDetail.jsp") })
+	public String getshowDateDetail(){
+		try {
+			List<String> dateList=new ArrayList<String>();
+			String orderDates=request.getParameter("orderDates");
+			if(StringUtils.isNotBlank(orderDates)){
+				String[] strs=orderDates.split(",");
+				for (String string : strs) {
+					dateList.add(string);
+				}
+			}
+			request.setAttribute("dateList",dateList);
+			String theListType=request.getParameter("theListType");
+			request.setAttribute("theListType",theListType);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return SUCCESS;
+	}
+	/**
+	 * 查看退票记录信息
+	 * @return
+	 */
+	@Action(value = "passengerReturnTicketList", results = { @Result(name = "success", location = "../../view/user/passengerReturnTicketList.jsp") })
+	public String getPassengerReturnTicketList(){
+		try {
+			String passengerId=request.getParameter("passengerId");
+			currentPageIndex = request.getParameter("currentPageIndex")==null?0:Integer.parseInt(request.getParameter("currentPageIndex"));
+			/*每页显示条数*/
+			pageSize = 10;
+			if(null==search){
+				search=new Search();
+			}
+			passengerInfoEntity=service.getPassengerById(passengerId);
+			if(null!=passengerInfoEntity){
+				search.setField06(passengerInfoEntity.getDisplayId());//乘客回显id
+			}
+			map = iLeaseOrderService.hasReturnTicketListByPage(search, currentPageIndex, pageSize);
+			list = (List) map.get("list");//数据对象
+			page = (Page) map.get("page");//分页对象
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return SUCCESS;
+	}
+	/**
+	 * 查看改签记录信息
+	 * @return
+	 */
+	@Action(value = "passengerChangeTicketList", results = { @Result(name = "success", location = "../../view/user/passengerChangeTicketList.jsp") })
+	public String getPassengerChangeTicketList(){
+		try {
+			String passengerId=request.getParameter("passengerId");
+			currentPageIndex = request.getParameter("currentPageIndex")==null?0:Integer.parseInt(request.getParameter("currentPageIndex"));
+			/*每页显示条数*/
+			pageSize = 10;
+			if(null==search){
+				search=new Search();
+			}
+			search.setField07(passengerId);//乘客id
+			map = changeTicketService.changedTicketList(search,currentPageIndex,pageSize);
+			list = (List) map.get("list");//数据对象
+			page = (Page) map.get("page");//分页对象
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return SUCCESS;
+	}
+	/**
+	 * 乘客拉黑或恢复操作
+	 * @return
+	 * @throws Exception
+	 */
+	@Action(value = "passengerChangeStatus", results = { @Result(type="json") })
+	public String changeStatus(){
+		try {
+			String returnStr=null;
+			
+			String passengerId=request.getParameter("passengerId");
+			String blackFlag=request.getParameter("blackFlag");
+			
+			if(StringUtils.isBlank(passengerId)||StringUtils.isBlank(blackFlag)){
+				returnStr="信息丢失，请刷新列表重新操作！";
+			}
+			else{
+				PassengerInfoEntity passengerInfo=service.getPassengerById(passengerId);
+				if(null==passengerInfo){
+					returnStr="信息丢失，请刷新列表重新操作！";
+				}
+				else{
+					if("0".equals(blackFlag)){//正常
+						passengerInfo.setBlackFlag(new Short("1"));
+					}
+					else{//拉黑
+						passengerInfo.setBlackFlag(new Short("0"));
+					}
+					SysAdminVo sysAdmin = (SysAdminVo) this.request.getSession().getAttribute("userInfo");
+					int returnNum=service.updatePassenger(passengerInfo,null==sysAdmin?null:sysAdmin.getUserId());
+					if(returnNum>0){
+						returnStr="ok";
+					}
+					else{
+						returnStr="操作失败，请刷新列表重新操作！";
+					}
+				}
+			}
+			HttpServletResponse response=ServletActionContext.getResponse();
+			response.setCharacterEncoding("utf-8");
+			response.getWriter().write(returnStr);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	
+	/**
+	 * 重置乘客密码
+	 * 
+	 * @return
+	 * @throws Exception
+	 */
+	@Action(value = "resetPsPassword", results = { @Result(type = "json") })
+	public void resetPsPassword() throws Exception {
+		String passengerId = request.getParameter("passengerId");
+		HttpSession session = request.getSession();
+		SysAdminVo admin = (SysAdminVo) session.getAttribute("userInfo");
+		String json = "error";
+		if (passengerId == null) {
+			json = "idNull";
+		} else {
+			int flag = service.resetPsPassword(passengerId, admin.getUserId());
+			if (flag > 0) {
+				json = "success";
+			}
+		}
+		JsonWriter.write(json);
+	}
+
+	public PassengerInfoEntity getPassengerInfoEntity() {
+		return passengerInfoEntity;
+	}
+
+	public void setPassengerInfoEntity(PassengerInfoEntity passengerInfoEntity) {
+		this.passengerInfoEntity = passengerInfoEntity;
+	}
+
+	public Integer getCurrentPageIndex() {
+		return currentPageIndex;
+	}
+
+	public void setCurrentPageIndex(Integer currentPageIndex) {
+		this.currentPageIndex = currentPageIndex;
+	}
+
+	public Integer getPageSize() {
+		return pageSize;
+	}
+
+	public void setPageSize(Integer pageSize) {
+		this.pageSize = pageSize;
+	}
+
+	public Integer getRegsit() {
+		return regsit;
+	}
+
+	public void setRegsit(Integer regsit) {
+		this.regsit = regsit;
+	}
+
+	public List<SysArea> getProSysAreas() {
+		return proSysAreas;
+	}
+
+	public void setProSysAreas(List<SysArea> proSysAreas) {
+		this.proSysAreas = proSysAreas;
+	}
+}

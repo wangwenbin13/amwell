@@ -1,0 +1,54 @@
+apply plugin:'war'
+apply plugin:'eclipse-wtp'
+apply plugin:'pmd'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+	compile 'mysql:mysql-connector-java:5.1.36'
+	compile 'org.apache.httpcomponents:httpclient:4.4.1'
+	compile 'org.springframework:spring-tx:3.2.14.RELEASE'
+	compile 'org.springframework:spring-context-support:3.2.14.RELEASE'
+	compile('org.springframework:spring-struts:3.2.14.RELEASE') { 
+		exclude(group:'struts')
+	}
+	compile 'org.apache.struts:struts2-spring-plugin:2.3.24'
+	compile 'org.quartz-scheduler:quartz:1.8.6'
+	compile 'org.apache.struts:struts2-core:2.3.24'
+	compile 'org.apache.struts:struts2-convention-plugin:2.3.24'
+	compile 'org.apache.struts:struts2-json-plugin:2.3.24'
+	compile 'commons-dbutils:commons-dbutils:1.6'
+	compile 'org.apache.commons:commons-lang3:3.4'
+	compile 'cn.jpush.api:jpush-client:3.1.3'
+    compile 'com.paypal.sdk:rest-api-sdk:1.2.5'
+    compile 'redis.clients:jedis:2.7.3'
+    providedCompile 'javax.servlet:servlet-api:2.5'
+    providedCompile fileTree(dir: "${webAppDirName}/WEB-INF/lib", include: '*.jar')
+
+	// Logging
+	compile 'org.slf4j:jcl-over-slf4j:1.7.12'
+	compile 'org.slf4j:slf4j-log4j12:1.7.12'
+	compile 'log4j:log4j:1.2.17'
+
+    // Weixin
+	compile 'org.jdom:jdom:1.1.3'
+	compile 'org.json:json:20140107'
+}
+
+configurations.compile.exclude group:'commons-logging'
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
+pmd {
+	toolVersion = '5.3.3'
+	targetJdk = 1.7
+	ignoreFailures = true
+	sourceSets = [ sourceSets.main ]
+	reportsDir = file("$project.buildDir/reports/pmd")
+	ruleSets = [ 'java-basic', 'java-braces', 'java-unusedcode' ]
+}
+eclipse.wtp.component.contextPath = 'app2'

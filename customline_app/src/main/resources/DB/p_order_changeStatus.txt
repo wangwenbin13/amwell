@@ -1,0 +1,58 @@
+DELIMITER $$
+
+USE `amwellcustomline`$$
+
+DROP PROCEDURE IF EXISTS `p_order_changeStatus`$$
+
+CREATE DEFINER=`root`@`%` PROCEDURE `p_order_changeStatus`()
+BEGIN
+	
+	-- 订单ID
+	DECLARE v_leaseOrderid VARCHAR(50);
+	
+	-- 下订单时间
+	DECLARE v_leaseOrderTime VARCHAR(50);
+	
+	-- 订单号
+	DECLARE v_leaseOrderNo VARCHAR(50);
+	
+	-- 定义游标结束标识
+	DECLARE STOP INT DEFAULT 0;
+	
+	DECLARE cur CURSOR FOR (SELECT leaseOrderid,leaseOrderTime,leaseOrderNo FROM amwellcustomline.`lease_base_info` WHERE payStatus = '0');
+	
+	-- 声明游标的异常处理，设置一个终止标记 
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET STOP = 1; 
+	
+	-- 打开游标
+	OPEN cur;
+	
+	FETCH cur INTO v_leaseOrderid,v_leaseOrderTime,v_leaseOrderNo;
+		
+         WHILE STOP <> 1 DO
+	
+		-- SELECT ROUND((UNIX_TIMESTAMP('2012-06-09 00:10:11')-UNIX_TIMESTAMP('2012-06-09 00:26:42'))/60) 两个时间相差的分数
+		
+		-- SHOW VARIABLES LIKE 'event_scheduler'; 查看事件
+		
+		-- SET GLOBAL event_scheduler = ON; 开启事件
+		
+		IF (ROUND((UNIX_TIMESTAMP(NOW())-UNIX_TIMESTAMP(v_leaseOrderTime))/60)) > (SELECT MIN(orderValiteTime)  FROM sys_app_setting) THEN 
+			
+			UPDATE amwellcustomline.`lease_base_info` SET payStatus = '2' WHERE leaseOrderid = v_leaseOrderid AND payStatus <> 1;
+			UPDATE amwellcustomline.`passenger_discount_info` SET disstatus = '0',orderno = '' WHERE orderno = v_leaseOrderNo;
+				
+		END IF;
+             
+              -- 获取下一行数据。
+	     FETCH cur INTO v_leaseOrderid,v_leaseOrderTime,v_leaseOrderNo;
+	     
+        END WHILE;
+        
+        -- 关闭游标
+        CLOSE cur;             
+		
+	
+    END$$
+
+DELIMITER ;

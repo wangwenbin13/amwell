@@ -1,0 +1,672 @@
+package com.pig84.ab.action;
+
+import java.io.IOException;
+import java.util.List;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.ExceptionMapping;
+import org.apache.struts2.convention.annotation.ExceptionMappings;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.pig84.ab.cache.DriverCache;
+import com.pig84.ab.service.IDriverService;
+import com.pig84.ab.service.ILoginAndRegisterService;
+import com.pig84.ab.utils.CacheUtil;
+import com.pig84.ab.utils.CookieUtil;
+import com.pig84.ab.utils.Html;
+import com.pig84.ab.utils.Message;
+import com.pig84.ab.utils.MyDate;
+import com.pig84.ab.utils.PropertyManage;
+import com.pig84.ab.utils.Sha1Utils;
+import com.pig84.ab.vo.Driver;
+import com.pig84.ab.vo.DriverScheduleInfo;
+import com.pig84.ab.vo.bean.AppVo_1;
+import com.pig84.ab.vo.bean.AppVo_12;
+import com.pig84.ab.vo.bean.AppVo_1_list;
+import com.pig84.ab.vo.bean.AppVo_2;
+import com.pig84.ab.vo.bean.AppVo_2_list;
+import com.pig84.ab.vo.bean.AppVo_3_list;
+import com.pig84.ab.vo.bean.AppVo_4;
+import com.pig84.ab.vo.bean.AppVo_5;
+import com.pig84.ab.vo.bean.AppVo_7;
+import com.pig84.ab.vo.bean.AppVo_7_list;
+import com.pig84.ab.vo.bean.AppVo_8;
+import com.pig84.ab.vo.driver.DriverInfoEntity;
+import com.pig84.ab.vo.driver.DriverWithdrawAskfor;
+
+/**
+ * 司机相关
+ * 
+ * @author gongxueting
+ * 
+ */
+@ParentPackage("no-interceptor")
+@Namespace("/app_driver")
+@SuppressWarnings("all")
+@ExceptionMappings( { @ExceptionMapping(exception = "java.lange.RuntimeException", result = "error") })
+public class DriverAction extends BaseAction {
+
+	@Autowired
+	private IDriverService driverService;
+
+	@Autowired
+	private ILoginAndRegisterService loginAndRegisterService;
+
+	/**
+	 * 登录
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "login", results = { @Result(type = "json") })
+	public String login() throws IOException {
+		String imei = request.getParameter("imei");
+		String telephone = request.getParameter("mobile");
+		String passWord_ = request.getParameter("passWord");
+		String terminal = request.getParameter("terminal");// 设备类型 1-android
+		// 2-ios
+		String passWord = Sha1Utils.encrypt(telephone + "&" + passWord_);
+
+		DriverInfoEntity appUser = driverService.login(telephone, passWord,terminal, passWord_, imei);
+
+		// 不成功
+		if (!"0".equals(appUser.getFlag())) {
+
+			AppVo_1 vo = new AppVo_1();
+			vo.setA1(appUser.getFlag());
+			write(vo);
+
+			// 成功
+		} else {
+			
+			DriverCache.setDriver(appUser);
+			
+			AppVo_12 vo = new AppVo_12();
+			vo.setA1(appUser.getFlag());
+			vo.setA2(appUser.getDriverId()); // 用户ID
+			vo.setA3(appUser.getDisplayId()); // 回显ID
+			vo.setA4(appUser.getDriverName()); // 姓名
+			vo.setA5(appUser.getSex() + ""); // 性别
+			vo.setA6(appUser.getTelephone()); // 手机号码
+			String headerIp = PropertyManage.get("header.pic.ip");// IP地址
+			if (appUser.getHeaderPicUrl() != null && !"".equals(appUser.getHeaderPicUrl())) {
+				vo.setA7(headerIp + "/" + appUser.getHeaderPicUrl()); // 头像URL
+			}
+			vo.setA8(appUser.getBusinessName());// 商户名称简称
+			// ////////////////////////////////////////////////////////////////
+			// 登录成功，则添加im用户(如果登录用户不是im用户，则保存为im用户)
+			String imUserId = this.driverService.addImUser(appUser.getDriverId(), "2");// 保存司机信息
+			vo.setA12(imUserId);
+			// ////////////////////////////////////////////////////////////////
+			write(vo);
+		}
+
+		return null;
+	}
+
+	/**
+	 * 退出登录
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "loginOut", results = { @Result(type = "json") })
+	public String loginOut() throws IOException {
+		CookieUtil.removeCookie("did");
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1("1");
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 发送验证码
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "sendMsgCode", results = { @Result(type = "json") })
+	public String sendMsgCode() throws IOException {
+		String mobileNo = request.getParameter("mobileNo");// 发送手机号码
+
+		AppVo_1 vo = new AppVo_1();
+		String flag = driverService.checkMobile(mobileNo);
+		if ("0".equals(flag)) {// 已注册
+			String random = RandomStringUtils.randomNumeric(6);
+			logger.info("Send verify code " + random);
+			CacheUtil.setCache(mobileNo, random, 120);
+			new Message("【小猪巴士】您的验证码为：%s，2分钟内有效，请尽快验证。", random).sendTo(mobileNo);
+			vo.setA1("1");// 成功
+		} else {
+			vo.setA1("2");// 该手机尚未注册
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 获取验证码
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getMsgCode", results = { @Result(type = "json") })
+	public String getMsgCode() throws IOException {
+		String mobileNo = request.getParameter("mobileNo");// 发送手机号码
+//		String url = PropertyManage.get("getMsg");
+//		String result = Http.post(url, "mobileNo", mobileNo);
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1(CacheUtil.getCache(mobileNo));
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 找回密码
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "resetPwd", results = { @Result(type = "json") })
+	public String resetPwd() throws IOException {
+		String mobileNo = request.getParameter("mobileNo");
+		String pwd_ = request.getParameter("pwd");
+		String pwd = Sha1Utils.encrypt(mobileNo + "&" + pwd_);
+		String flag = driverService.resetPwd(mobileNo, pwd, pwd_);// 0:该手机号码尚未注册
+		// 1:成功 2:失败
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1(flag);
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 修改司机信息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "updateDriverInfo", results = { @Result(type = "json") })
+	public String updateDriverInfo() throws IOException {
+		String driverId = request.getParameter("driverId");
+
+		AppVo_1 vo = new AppVo_1();
+
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		if (null != appUser) {
+			if (driverId == null || "".equals(driverId)) {
+				if (appUser != null) {
+					driverId = appUser.getDriverId();
+				}
+			}
+
+			String oldPwd_ = request.getParameter("oldPwd");// 原密码
+			String newPwd = request.getParameter("newPwd");// 新密码
+
+			String phone = appUser.getTelephone();
+
+			if (StringUtils.isNotEmpty(oldPwd_)) {
+				oldPwd_ = Sha1Utils.encrypt(phone + "&" + oldPwd_);
+			}
+			String result = driverService.updateDriverInfo(driverId, null,null, oldPwd_, newPwd);
+
+			vo.setA1(result); // -1.司机不存在 1.原密码错误 2.成功 3.失败
+
+			if ("1".equals(result)) {
+				DriverInfoEntity newAppUser = driverService.getDriverById(driverId);
+//				session.put("appDriver", newAppUser);
+			}
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 获取司机行程
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getDriverSchedule", results = { @Result(type = "json") })
+	public String getDriverSchedule() throws IOException {
+
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		if (null != appUser) {
+			String driverId = request.getParameter("driverId");
+			String flag = request.getParameter("flag");
+			if (driverId == null || "".equals(driverId)) {
+				if (appUser != null) {
+					driverId = appUser.getDriverId();
+				}
+			}
+			AppVo_7_list vo = driverService.getDriverScheduleById(driverId,
+					flag);
+			write(vo);
+		} else {
+			AppVo_1 vo = new AppVo_1();
+			vo.setA1("-1");// 未登录
+			write(vo);
+		}
+		return null;
+	}
+
+	/**
+	 * 获取司机行程详情
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getScheduleDetail")
+	public void getScheduleDetail() throws IOException {
+		DriverScheduleInfo driverScheduleInfo = new DriverScheduleInfo();
+		if (null != DriverCache.getDriver()) {
+			String lineBaseId = request.getParameter("lineBaseId");
+			String lineClassId = request.getParameter("lineClassId");
+			driverScheduleInfo = driverService.getScheduleDetail(lineBaseId,lineClassId);
+		} else {
+			driverScheduleInfo.setA1("0");// 未登录
+		}
+		write(driverScheduleInfo);
+	}
+
+	/**
+	 * 查询延误消息模版
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getDelayMsgList", results = { @Result(type = "json") })
+	public String getDelayMsgList() throws IOException {
+
+		if (null != DriverCache.getDriver()) {
+			List<AppVo_4> list = driverService.getDelayMsgList();
+			AppVo_1_list vl = new AppVo_1_list();
+			vl.setA1("1");// 已登录
+			vl.setList(list);
+			write(vl);
+		} else {
+			AppVo_1 vo = new AppVo_1();
+			vo.setA1("0");// 未登录
+			write(vo);
+		}
+		return null;
+	}
+
+	/**
+	 * 修改班次相关信息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "updateLineClass", results = { @Result(type = "json") })
+	public String updateLineClass() throws IOException {
+
+		AppVo_1 vo = new AppVo_1();
+		Driver appUser = DriverCache.getDriver();
+		if (null != appUser) {
+			String lineBaseId = request.getParameter("lineBaseId");
+			String lineClassId = request.getParameter("lineClassId");
+			String delayMsgId = request.getParameter("delayMsgId");
+			String dispatchStatus = request.getParameter("dispatchStatus");
+			String currentStationName = request.getParameter("currentStationName");
+			String driverId = appUser.getDriverId();
+			String flag = driverService.updateLineClass(lineBaseId,
+					lineClassId, driverId, delayMsgId, dispatchStatus,
+					currentStationName);
+			vo.setA1(flag);// 2.成功 3.失败
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 查询已上车用户信息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getAboardUserInfo", results = { @Result(type = "json") })
+	public String getAboardUserInfo() throws IOException {
+
+		AppVo_2_list vo = new AppVo_2_list();
+		if (null != DriverCache.getDriver()) {
+			String lineBaseId = request.getParameter("lineBaseId");
+			String lineClassId = request.getParameter("lineClassId");
+			vo = driverService.getAboardUserInfo(lineBaseId, lineClassId);
+		} else {
+			vo.setA1("-1");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 司机反馈
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "doFeedback", results = { @Result(type = "json") })
+	public String doFeedback() throws IOException {
+		AppVo_1 vo = new AppVo_1();
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		if (null != appUser) {
+			String context = request.getParameter("context");// 内容
+			context = Html.purge(context);
+			String phoneNo = request.getParameter("phoneNo");// 电话
+
+			String flag = driverService.addFeedback(context, phoneNo, appUser
+					.getDriverId()); // 1:成功 2：失败
+			vo.setA1(flag);
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 根据app端所传时间取最近未发车的两个班次
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getAlarmTime", results = { @Result(type = "json") })
+	public String getAlarmTime() throws IOException {
+		AppVo_1_list vo = new AppVo_1_list();
+		String appCurTime = request.getParameter("appCurTime");// 时间
+		String driverId = request.getParameter("driverId");// 司机id
+		if (StringUtils.isEmpty(driverId)) {
+			vo.setA1("0");// 参数有误
+		} else {
+			vo.setA1("1");// 参数正确
+			List<AppVo_1> list = driverService.getAlarmTime(driverId,
+					appCurTime);
+			vo.setList(list);
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 获取司机账户余额
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getDriverAccount", results = { @Result(type = "json") })
+	public String getDriverAccount() throws IOException {
+		AppVo_2 vo = new AppVo_2();
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		if (null != appUser) {
+			vo.setA1("1");// 已登录
+			AppVo_1 vo1 = driverService.getDriverAccount(appUser.getDriverId());
+			vo.setA2(vo1.getA1());
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 获取司机账户明细
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getDriverAccountDetail", results = { @Result(type = "json") })
+	public String getDriverAccountDetail() throws IOException {
+		AppVo_1_list vo = new AppVo_1_list();
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		if (null != appUser) {
+			vo.setA1("1");// 已登录
+			List<AppVo_5> list = driverService.getDriverAccountDetail(appUser
+					.getDriverId());
+			vo.setList(list);
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 分页查询司机评论
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getDriverComment", results = { @Result(type = "json") })
+	public String getDriverComment() throws IOException {
+
+		AppVo_3_list vo = new AppVo_3_list();
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		if (null != appUser) {
+			String pageSize_ = request.getParameter("pageSize");// 每页显示条数
+			String currentPage_ = request.getParameter("currentPage");// 当前页数
+
+			int currentPage = 0;
+			int pageSize = 5;
+
+			if (currentPage_ != null && !currentPage_.equals("")) {
+				currentPage = Integer.valueOf(currentPage_);
+			}
+
+			if (pageSize_ != null && !pageSize_.equals("")) {
+				pageSize = Integer.valueOf(pageSize_);
+			}
+
+			vo = driverService.getDriverCommentInfo(appUser.getDriverId(),
+					String.valueOf(currentPage), String.valueOf(pageSize));
+
+			vo.setA1("1");// 已经登录
+		} else {
+			vo.setA1("0");// 未登录
+		}
+
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 获取司机端版本号
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "getDriverVersion", results = { @Result(type = "json") })
+	public String getDriverVersion() throws IOException {
+		String opic = PropertyManage.get("ftp.image.root.dpic");
+		String root = PropertyManage.get("http.root.url");
+
+		AppVo_5 vo = driverService.getDriverVersion();
+		if(vo!=null){
+			String url = root + "/busonline/" + opic + "/" + vo.getA2();
+			vo.setA2(url);
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 添加司机提现申请
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "addDriverWithdrawAskfor", results = { @Result(type = "json") })
+	public String addDriverWithdrawAskfor() throws IOException {
+
+		AppVo_2 vo = new AppVo_2();
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		if (null != appUser) {
+			String driverName = request.getParameter("driverName");// 司机姓名
+			driverName = Html.purge(driverName);
+			if (!appUser.getDriverName().equals(driverName)) {
+				vo.setA1("-1");// 姓名错误
+			} else {
+				vo.setA1("1");// 已经登录
+
+				String amount = request.getParameter("amount");// 提现金额
+				String withdrawType = request.getParameter("withdrawType");// 提现方式（1.支付宝
+				// 2.微信
+				// 3.银联）
+				String withdrawAccount = request
+						.getParameter("withdrawAccount");// 提现账户
+				DriverWithdrawAskfor dwa = new DriverWithdrawAskfor();
+				dwa.setDriverId(appUser.getDriverId());
+				dwa.setAmount(amount);
+				dwa.setWithdrawType(withdrawType);
+				dwa.setWithdrawAccount(withdrawAccount);
+				dwa.setDriverName(driverName);
+				dwa.setAskforTime(MyDate.Format.DATETIME.now());
+				dwa.setHandleType("0");// 申请处理状态（0.未处理 1.已处理）
+
+				int flag = driverService.addDriverWithdrawAskfor(dwa);
+				vo.setA2(flag + "");// 1.成功 其它：失败
+			}
+		} else {
+			vo.setA1("0");// 未登录
+		}
+
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 司机消息列表
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "driverMsgList", results = { @Result(type = "json") })
+	public String driverMsgList() throws IOException {
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		String userid = "";// 用户ID
+		AppVo_1_list vo = new AppVo_1_list();
+		if (appUser != null) {
+			userid = appUser.getDriverId();
+			vo.setA1("1");
+
+			String pageSize_ = request.getParameter("pageSize");// 每页显示条数
+			String currentPage_ = request.getParameter("currentPage");// 当前页数
+
+			int currentPage = 0;
+			int pageSize = 5;
+
+			if (currentPage_ != null && !currentPage_.equals("")) {
+				currentPage = Integer.valueOf(currentPage_);
+			}
+
+			if (pageSize_ != null && !pageSize_.equals("")) {
+				pageSize = Integer.valueOf(pageSize_);
+			}
+
+			List<AppVo_8> list = driverService.msgList(userid, String
+					.valueOf(currentPage), String.valueOf(pageSize));
+			vo.setList(list);
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 消息详细
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "driverMsgInfo", results = { @Result(type = "json") })
+	public String driverMsgInfo() throws IOException {
+		String msgid = request.getParameter("msgId");// 消息ID
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		AppVo_7 vo = new AppVo_7();
+		String userid = "";
+
+		if (appUser != null) {
+			userid = appUser.getDriverId();
+			vo.setA1("1");
+			AppVo_5 msg = loginAndRegisterService.msgInfo(msgid, userid);
+			if (msg != null) {
+				vo.setA2(msg.getA1());// 时间
+				vo.setA3(msg.getA2());// 标题
+				vo.setA4(msg.getA3());// 正文
+				if (msg.getA4() == null) {
+					vo.setA5("");
+				} else {
+					vo.setA5(msg.getA4());// 图片
+				}
+			}
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 删除消息
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	@Action(value = "delDriverMsg", results = { @Result(type = "json") })
+	public String delDriverMsg() throws IOException {
+		String msgids = request.getParameter("msgIds");// 消息ID
+		Driver appUser = DriverCache.getDriver();// 当前登录用户信息
+		AppVo_1 vo = new AppVo_1();
+		String userid = "";
+
+		if (appUser != null) {
+			userid = appUser.getDriverId();
+			String flag = loginAndRegisterService.delMsg(msgids, userid);
+			vo.setA1(flag);
+		} else {
+			vo.setA1("0");// 未登录
+		}
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 重置未加密的司机密码
+	 */
+	@Action(value = "updateDriverPassword", results = { @Result(type = "json") })
+	public String updateDriverPassword() throws IOException {
+		int flag = driverService.updateDriverPassword();
+		AppVo_1 vo = new AppVo_1();
+		vo.setA1(flag + "");
+		write(vo);
+		return null;
+	}
+
+	/**
+	 * 更新GPS设备数据
+	 * 
+	 */
+	@Action(value = "updateGps", results = { @Result(type = "json") })
+	public String updateGps() throws IOException {
+		String gpsNo = request.getParameter("gpsNo");
+		String lat = request.getParameter("lat");
+		String lon = request.getParameter("lng");
+		String time = request.getParameter("time");
+		String speed = request.getParameter("speed");
+		String angle = request.getParameter("angle");
+		driverService.updateGpsInfo(gpsNo, time, lon, lat, speed, angle);
+		write();
+		return null;
+	}
+
+}
